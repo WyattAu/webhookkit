@@ -15,7 +15,6 @@ pub struct GoCardlessEvent {
 ///
 /// Expects `sig_header` to be the value of the `Webhook-Signature` header,
 /// which contains `hex=...` pairs.
-#[allow(dead_code)]
 pub fn verify_gocardless_webhook(
     body: &str,
     sig_header: &str,

@@ -15,7 +15,6 @@ pub struct StripeEvent {
 ///
 /// Expects `sig_header` to be the value of the `Stripe-Signature` header,
 /// which contains `t=...,v1=...` pairs.
-#[allow(dead_code)]
 pub fn verify_stripe_webhook(
     body: &str,
     sig_header: &str,
