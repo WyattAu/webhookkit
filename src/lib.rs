@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
 //! Webhook signature verification for Rust.
 //!
 //! Provides HMAC-SHA256 verification, timestamp validation, replay-attack
@@ -73,6 +74,34 @@ pub(crate) fn compute_hmac_sha256(payload: &[u8], secret: &[u8]) -> String {
     let mut mac = HmacSha256::new_from_slice(secret).expect("HMAC accepts any key size");
     mac.update(payload);
     hex::encode(mac.finalize().into_bytes())
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn hmac_sign_verify_roundtrip(key in "\\PC{1,256}", message in "\\PC{1,256}") {
+            let sig = compute_hmac_sha256(message.as_bytes(), key.as_bytes());
+            prop_assert!(verify_hmac_sha256(message.as_bytes(), key.as_bytes(), sig.as_bytes()).is_ok());
+        }
+
+        #[test]
+        fn verify_wrong_secret_fails(key1 in "\\PC{1,256}", key2 in "\\PC{1,256}", message in "\\PC{1,256}") {
+            prop_assume!(key1 != key2);
+            let sig = compute_hmac_sha256(message.as_bytes(), key1.as_bytes());
+            prop_assert!(verify_hmac_sha256(message.as_bytes(), key2.as_bytes(), sig.as_bytes()).is_err());
+        }
+
+        #[test]
+        fn verify_wrong_message_fails(key in "\\PC{1,256}", msg1 in "\\PC{1,256}", msg2 in "\\PC{1,256}") {
+            prop_assume!(msg1 != msg2);
+            let sig = compute_hmac_sha256(msg1.as_bytes(), key.as_bytes());
+            prop_assert!(verify_hmac_sha256(msg2.as_bytes(), key.as_bytes(), sig.as_bytes()).is_err());
+        }
+    }
 }
 
 #[cfg(test)]
