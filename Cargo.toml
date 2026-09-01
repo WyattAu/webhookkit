@@ -7,6 +7,9 @@ license = "MIT OR Apache-2.0"
 description = "Webhook signature verification for Rust — HMAC-SHA256, timestamp validation, and provider-specific parsers for Stripe, GoCardless, and more"
 readme = "README.md"
 repository = "https://github.com/WyattAu/webhookkit"
+keywords = ["webhook", "hmac", "verification"]
+categories = ["web-programming"]
+exclude = ["/target"]
 
 [dependencies]
 hmac = "0.12"
@@ -22,3 +25,4 @@ default = ["hmac-sha256"]
 hmac-sha256 = []
 
 [dev-dependencies]
+proptest = "1"
