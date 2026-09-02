@@ -25,6 +25,17 @@ mod stripe;
 mod timestamp;
 
 /// C FFI bindings for cross-language interop.
+///
+/// When the `ffi` feature is enabled, a C header file (`webhookkit.h`) is
+/// generated at build time in the crate's `OUT_DIR`. The header declares
+/// [`webhookkit_verify_hmac_sha256`] and [`webhookkit_version`] with
+/// standard C linkage.
+///
+/// To locate the header at build time:
+///
+/// ```sh
+/// echo "$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "webhookkit") | .manifest_path' | xargs dirname)/target/debug/build/webhookkit-*/out/webhookkit.h"
+/// ```
 #[cfg(feature = "ffi")]
 #[allow(unsafe_code)]
 pub mod ffi;
