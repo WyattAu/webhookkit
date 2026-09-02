@@ -23,6 +23,7 @@ serde_json = "1"
 [features]
 default = ["hmac-sha256"]
 hmac-sha256 = []
+ffi = []
 
 [dev-dependencies]
 proptest = "1"

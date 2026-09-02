@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![deny(missing_docs)]
 //! Webhook signature verification for Rust.
 //!
@@ -23,6 +23,11 @@ mod gocardless;
 mod replay;
 mod stripe;
 mod timestamp;
+
+/// C FFI bindings for cross-language interop.
+#[cfg(feature = "ffi")]
+#[allow(unsafe_code)]
+pub mod ffi;
 
 pub use error::WebhookError;
 pub use gocardless::{GoCardlessEvent, verify_gocardless_webhook};
