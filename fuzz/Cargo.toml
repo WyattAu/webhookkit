@@ -18,3 +18,9 @@ name = "fuzz_verify_hmac"
 path = "fuzz_targets/fuzz_verify_hmac.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_verify"
+path = "fuzz_targets/fuzz_verify.rs"
+test = false
+doc = false
