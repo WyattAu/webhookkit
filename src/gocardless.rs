@@ -1,4 +1,4 @@
-use crate::{verify_hmac_sha256, WebhookError};
+use crate::{WebhookError, verify_hmac_sha256};
 
 /// A parsed GoCardless webhook event.
 #[derive(Debug, Clone)]
@@ -24,8 +24,8 @@ pub fn verify_gocardless_webhook(
 
     verify_hmac_sha256(body.as_bytes(), secret.as_bytes(), hex_sig.as_bytes())?;
 
-    let payload: serde_json::Value = serde_json::from_str(body)
-        .map_err(|e| WebhookError::ParseError(e.to_string()))?;
+    let payload: serde_json::Value =
+        serde_json::from_str(body).map_err(|e| WebhookError::ParseError(e.to_string()))?;
 
     let resource_type = payload
         .get("resource_type")

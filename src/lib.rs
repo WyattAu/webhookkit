@@ -63,8 +63,8 @@ pub fn verify_hmac_sha256(
         HmacSha256::new_from_slice(secret).map_err(|e| WebhookError::ParseError(e.to_string()))?;
     mac.update(payload);
 
-    let signature_bytes = hex::decode(expected_signature)
-        .map_err(|e| WebhookError::ParseError(e.to_string()))?;
+    let signature_bytes =
+        hex::decode(expected_signature).map_err(|e| WebhookError::ParseError(e.to_string()))?;
 
     let result = mac.finalize().into_bytes();
 
@@ -123,8 +123,8 @@ mod proptests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
     use std::time::Duration;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn verify_hmac_sha256_known_vector() {
@@ -257,7 +257,10 @@ mod tests {
     fn replay_guard_duplicate_denied() {
         let guard = ReplayGuard::new(Duration::from_secs(300));
         assert!(guard.check("evt-1").is_ok());
-        assert!(matches!(guard.check("evt-1"), Err(WebhookError::ReplayDetected)));
+        assert!(matches!(
+            guard.check("evt-1"),
+            Err(WebhookError::ReplayDetected)
+        ));
     }
 
     #[test]

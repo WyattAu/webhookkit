@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{verify_hmac_sha256, verify_timestamp, WebhookError};
+use crate::{WebhookError, verify_hmac_sha256, verify_timestamp};
 
 /// A parsed Stripe webhook event.
 #[derive(Debug, Clone)]
@@ -25,17 +25,17 @@ pub fn verify_stripe_webhook(
     let timestamp = parts
         .get("t")
         .ok_or_else(|| WebhookError::ParseError("missing timestamp in Stripe-Signature".into()))?;
-    let v1 = parts
-        .get("v1")
-        .ok_or_else(|| WebhookError::ParseError("missing v1 signature in Stripe-Signature".into()))?;
+    let v1 = parts.get("v1").ok_or_else(|| {
+        WebhookError::ParseError("missing v1 signature in Stripe-Signature".into())
+    })?;
 
     verify_timestamp(timestamp, 300)?;
 
     let signed_payload = format!("{}.{}", timestamp, body);
     verify_hmac_sha256(signed_payload.as_bytes(), secret.as_bytes(), v1.as_bytes())?;
 
-    let payload: serde_json::Value = serde_json::from_str(body)
-        .map_err(|e| WebhookError::ParseError(e.to_string()))?;
+    let payload: serde_json::Value =
+        serde_json::from_str(body).map_err(|e| WebhookError::ParseError(e.to_string()))?;
 
     let event_type = payload
         .get("type")
@@ -43,7 +43,10 @@ pub fn verify_stripe_webhook(
         .unwrap_or("unknown")
         .to_string();
 
-    Ok(StripeEvent { event_type, payload })
+    Ok(StripeEvent {
+        event_type,
+        payload,
+    })
 }
 
 #[allow(dead_code)]
