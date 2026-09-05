@@ -1,0 +1,61 @@
+# Changelog
+
+All notable changes to this project are documented here. Format: [Keep a
+Changelog](https://keepachangelog.com/) — versions follow [semver](https://semver.org).
+
+## [Unreleased]
+
+## [1.0.0] - 2026-09-05
+
+First stable release. The public API surface is now covered by semver
+stability guarantees (verified with `cargo-semver-checks` on every release).
+
+### Added
+
+- C FFI tests exercising the full `ffi` module contract from Rust
+  (valid → `1`, tampered → `0`, invalid hex / non-UTF-8 / null → `-1`,
+  `webhookkit_version` returns the crate version) — no C toolchain required.
+- `THREAT-MODEL.md`: STRIDE analysis with verifying-test citations.
+- `SECURITY.md`: vulnerability disclosure policy and scope.
+
+### Fixed
+
+- `webhookkit_verify_hmac_sha256` now returns `0` for an invalid signature
+  and `-1` only for errors, matching its documented contract and the
+  generated `webhookkit.h` header (previously every failure returned `-1`).
+
+### Changed
+
+- 1.0.0 marks the API as stable: `verify_hmac_sha256`,
+  `verify_stripe_webhook`, `verify_gocardless_webhook`, `verify_timestamp`,
+  `ReplayGuard`, `WebhookError`, and the `ffi` module.
+
+## [0.2.0] - 2026-09-04
+
+### Added
+
+- C FFI bindings (`ffi` feature): `webhookkit_verify_hmac_sha256` and
+  `webhookkit_version` with standard C linkage for cross-language interop.
+- Build-time generation of a C header (`webhookkit.h`) into `OUT_DIR` when
+  the `ffi` feature is enabled.
+- `#![deny(unsafe_code)]` at the crate level, with the `ffi` module as the
+  single reviewed exception.
+- Fuzz targets `fuzz_verify_hmac` and `fuzz_verify` (cargo-fuzz) asserting
+  verification never panics on arbitrary input.
+
+## [0.1.0] - 2026-08-30
+
+### Added
+
+- Initial release: HMAC-SHA256 signature verification with constant-time
+  comparison (`verify_hmac_sha256`).
+- Provider-specific webhook parsers: Stripe (`verify_stripe_webhook`, with
+  300 s timestamp tolerance) and GoCardless (`verify_gocardless_webhook`).
+- Timestamp freshness validation (`verify_timestamp`).
+- Replay-attack prevention (`ReplayGuard`) with bounded memory.
+- Property tests (proptest) for sign/verify roundtrips.
+
+[Unreleased]: https://github.com/WyattAu/webhookkit/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/WyattAu/webhookkit/compare/v0.2.0...v1.0.0
+[0.2.0]: https://github.com/WyattAu/webhookkit/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/WyattAu/webhookkit/releases/tag/v0.1.0

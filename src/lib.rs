@@ -285,6 +285,21 @@ mod tests {
     }
 
     #[test]
+    fn replay_guard_prunes_when_capacity_exceeded() {
+        let guard = ReplayGuard::new(Duration::from_secs(300));
+        for i in 0..10_000 {
+            assert!(guard.check(&format!("evt-{i}")).is_ok());
+        }
+        assert_eq!(guard.len(), 10_000);
+        // One entry over the cap is still accepted...
+        assert!(guard.check("evt-overflow").is_ok());
+        assert_eq!(guard.len(), 10_001);
+        // ...and the next check trips the size cap and clears the set.
+        assert!(guard.check("evt-0").is_ok());
+        assert_eq!(guard.len(), 1);
+    }
+
+    #[test]
     fn webhook_error_display() {
         assert_eq!(
             WebhookError::InvalidSignature.to_string(),
