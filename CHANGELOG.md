@@ -5,6 +5,19 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 
 ## [Unreleased]
 
+### Added
+- `no_std` support: stateless HMAC-SHA256 verification, GoCardless
+  verification/parsing, and the `ffi` surface build core-only with
+  `--no-default-features` (thumbv7em-none-eabihf passes `cargo check`).
+  New `std` feature (on by default — default builds are unchanged).
+
+### Changed
+- `timestamp`, `replay`, and `stripe` modules are gated behind the new
+  `std` feature: they require a wall clock (`SystemTime`) and/or a std
+  mutex, which have no `no_std` equivalent without a lock backend.
+  Crypto/parsing dependencies (`hmac`, `sha2`, `hex`, `subtle`, `serde`,
+  `serde_json`) now build without their std default features.
+
 ## [1.0.0] - 2026-09-05
 
 First stable release. The public API surface is now covered by semver

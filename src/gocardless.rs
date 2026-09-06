@@ -1,3 +1,5 @@
+use alloc::string::{String, ToString};
+
 use crate::{WebhookError, verify_hmac_sha256};
 
 /// A parsed GoCardless webhook event.

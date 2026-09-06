@@ -1,10 +1,19 @@
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
+#![cfg_attr(not(feature = "std"), no_std)]
+
 //! Webhook signature verification for Rust.
 //!
 //! Provides HMAC-SHA256 verification, timestamp validation, replay-attack
 //! prevention, and provider-specific parsers for **Stripe** and
 //! **GoCardless** webhooks.
+//!
+//! # no_std
+//!
+//! Stateless verification ([`verify_hmac_sha256`], GoCardless parsing, the
+//! `ffi` surface) builds core-only with `--no-default-features`. The
+//! `timestamp`, `replay`, and `stripe` modules require a wall clock / std
+//! mutex and are gated behind the `std` feature (on by default).
 //!
 //! # Quick Start
 //!
@@ -20,9 +29,16 @@
 
 mod error;
 mod gocardless;
+
+// Wall-clock / std-mutex-dependent surfaces.
+#[cfg(feature = "std")]
 mod replay;
+#[cfg(feature = "std")]
 mod stripe;
+#[cfg(feature = "std")]
 mod timestamp;
+
+extern crate alloc;
 
 /// C FFI bindings for cross-language interop.
 ///
@@ -42,10 +58,14 @@ pub mod ffi;
 
 pub use error::WebhookError;
 pub use gocardless::{GoCardlessEvent, verify_gocardless_webhook};
+#[cfg(feature = "std")]
 pub use replay::ReplayGuard;
+#[cfg(feature = "std")]
 pub use stripe::{StripeEvent, verify_stripe_webhook};
+#[cfg(feature = "std")]
 pub use timestamp::verify_timestamp;
 
+use alloc::string::ToString;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 

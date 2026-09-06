@@ -1,4 +1,4 @@
-use std::os::raw::c_char;
+use core::ffi::c_char;
 
 use crate::{WebhookError, verify_hmac_sha256};
 
@@ -74,7 +74,8 @@ pub extern "C" fn webhookkit_version() -> *const c_char {
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::{CStr, CString};
+    use alloc::ffi::CString;
+    use core::ffi::CStr;
 
     use super::*;
 

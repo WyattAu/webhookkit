@@ -1,3 +1,5 @@
+use alloc::string::String;
+
 /// Errors from webhook verification.
 #[derive(Debug, thiserror::Error)]
 pub enum WebhookError {

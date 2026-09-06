@@ -12,16 +12,20 @@ categories = ["web-programming"]
 exclude = ["/target"]
 
 [dependencies]
-hmac = "0.12"
-sha2 = "0.10"
-hex = "0.4"
-subtle = "2"
-thiserror = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+hmac = { version = "0.12", default-features = false }
+sha2 = { version = "0.10", default-features = false }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+subtle = { version = "2", default-features = false }
+thiserror = { version = "2", default-features = false }
+serde = { version = "1", default-features = false, features = ["alloc", "derive"] }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
 
 [features]
-default = ["hmac-sha256"]
+default = ["std", "hmac-sha256"]
+# Core-only build: stateless HMAC verification, GoCardless parsing, and the
+# `ffi` surface need no std. `timestamp`/`replay`/`stripe` need a wall clock
+# (SystemTime) and/or std Mutex, so they require `std`.
+std = []
 hmac-sha256 = []
 ffi = []
 
