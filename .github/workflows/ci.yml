@@ -54,3 +54,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.85.0
       - run: cargo check --all-features
+
+  embedded:
+    name: Embedded (thumbv7em-none-eabihf)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabihf
+      - uses: Swatinem/rust-cache@v2
+      # no_std tier: crate builds core-only (--no-default-features) for
+      # Cortex-M4F.
+      - run: cargo check --locked --target thumbv7em-none-eabihf --no-default-features
