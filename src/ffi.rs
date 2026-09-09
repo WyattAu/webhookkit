@@ -73,6 +73,8 @@ pub extern "C" fn webhookkit_version() -> *const c_char {
 }
 
 #[cfg(test)]
+// Test code: unwrap is the idiomatic way to assert setup success.
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use alloc::ffi::CString;
     use core::ffi::CStr;

@@ -31,8 +31,10 @@ const char* webhookkit_version(void);
 
 #endif // WEBHOOKKIT_H
 "#;
-        let out_dir = std::env::var("OUT_DIR").unwrap();
+        let out_dir =
+            std::env::var("OUT_DIR").unwrap_or_else(|e| panic!("cargo did not set OUT_DIR: {e}"));
         let dest_path = std::path::Path::new(&out_dir).join("webhookkit.h");
-        std::fs::write(dest_path, header).unwrap();
+        std::fs::write(dest_path, header)
+            .unwrap_or_else(|e| panic!("failed to write webhookkit.h header: {e}"));
     }
 }

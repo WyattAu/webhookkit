@@ -74,10 +74,10 @@ pub mod ffi;
 
 pub use error::WebhookError;
 pub use gocardless::{GoCardlessEvent, verify_gocardless_webhook};
-#[cfg(feature = "std")]
-pub use replay::ReplayGuard;
 #[cfg(all(feature = "std", feature = "redis"))]
 pub use replay::RedisReplayGuard;
+#[cfg(feature = "std")]
+pub use replay::ReplayGuard;
 #[cfg(feature = "std")]
 pub use stripe::{StripeEvent, verify_stripe_webhook};
 #[cfg(feature = "std")]
@@ -121,6 +121,8 @@ pub fn verify_hmac_sha256(
 /// Compute an HMAC-SHA256 signature and return it as a hex string.
 /// Used in tests to generate valid signatures.
 #[cfg(test)]
+// Test-only helper: HMAC accepts any key size, so this cannot fail.
+#[allow(clippy::expect_used)]
 pub(crate) fn compute_hmac_sha256(payload: &[u8], secret: &[u8]) -> String {
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
@@ -131,6 +133,8 @@ pub(crate) fn compute_hmac_sha256(payload: &[u8], secret: &[u8]) -> String {
 }
 
 #[cfg(test)]
+// Test code: unwrap is the idiomatic way to assert outcomes.
+#[allow(clippy::unwrap_used)]
 mod proptests {
     use super::*;
     use proptest::prelude::*;
@@ -159,6 +163,8 @@ mod proptests {
 }
 
 #[cfg(test)]
+// Test code: unwrap is the idiomatic way to assert outcomes.
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use std::time::Duration;
