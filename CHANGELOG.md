@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format: [Keep a
 Changelog](https://keepachangelog.com/) — versions follow [semver](https://semver.org).
 
-## [Unreleased]
+## [1.1.0] - 2026-09-09
 
 ### Added
 - `no_std` support: stateless HMAC-SHA256 verification, GoCardless
@@ -17,6 +17,13 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
   mutex, which have no `no_std` equivalent without a lock backend.
   Crypto/parsing dependencies (`hmac`, `sha2`, `hex`, `subtle`, `serde`,
   `serde_json`) now build without their std default features.
+
+### Docs
+- README and crate docs now lead with the differentiators (`no_std`
+  verification core, `ReplayGuard`, Stripe/GoCardless parsers) and add a
+  feature matrix vs `async-stripe` (full Stripe API — different scope) and
+  `svix` (webhook sending — different direction), with honest notes on
+  where webhookkit lags.
 
 ## [1.0.0] - 2026-09-05
 
