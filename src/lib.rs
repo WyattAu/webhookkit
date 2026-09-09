@@ -75,7 +75,7 @@ pub mod ffi;
 pub use error::WebhookError;
 pub use gocardless::{GoCardlessEvent, verify_gocardless_webhook};
 #[cfg(feature = "std")]
-pub use replay::ReplayGuard;
+pub use replay::{ReplayGuard, RedisReplayGuard};
 #[cfg(feature = "std")]
 pub use stripe::{StripeEvent, verify_stripe_webhook};
 #[cfg(feature = "std")]
