@@ -4,9 +4,25 @@
 
 //! Webhook signature verification for Rust.
 //!
-//! Provides HMAC-SHA256 verification, timestamp validation, replay-attack
-//! prevention, and provider-specific parsers for **Stripe** and
-//! **GoCardless** webhooks.
+//! webhookkit does one thing — **verify inbound webhook signatures** — with
+//! three differentiators:
+//!
+//! - **A `no_std` verification core.** The stateless HMAC-SHA256 path
+//!   ([`verify_hmac_sha256`], GoCardless parsing, the `ffi` surface) builds
+//!   with `--no-default-features` on `core` + `alloc`, on top of RustCrypto
+//!   `hmac`/`sha2` (both `no_std`); CI checks it against
+//!   `thumbv7em-none-eabihf`.
+//! - **Multi-provider support.** Signature formats for **Stripe**
+//!   (`t=…,v1=…`) and **GoCardless** (`hex=…`) are parsed and verified for
+//!   you, with constant-time comparison (`subtle`).
+//! - **Replay protection.** [`ReplayGuard`] tracks processed event IDs with
+//!   a TTL window, so at-least-once delivery doesn't mean double side
+//!   effects.
+//!
+//! It is not a Stripe SDK (see `async-stripe` for the full Stripe REST API)
+//! and it does not send webhooks (see `svix` for outbound delivery) — it
+//! sits strictly on the *consume-and-verify* side, including where those
+//! crates can't run: embedded and FFI.
 //!
 //! # no_std
 //!
