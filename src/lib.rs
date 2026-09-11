@@ -34,6 +34,8 @@
 //! # Quick Start
 //!
 //! ```no_run
+//! # #[cfg(feature = "std")]
+//! # fn demo() -> Result<(), webhookkit::WebhookError> {
 //! use webhookkit::{verify_hmac_sha256, verify_stripe_webhook, WebhookError};
 //!
 //! fn handle_stripe(payload: &str, sig_header: &str, secret: &str) -> Result<(), WebhookError> {
@@ -41,6 +43,10 @@
 //!     println!("event type: {}", event.event_type);
 //!     Ok(())
 //! }
+//!
+//! # Ok(())
+//! # }
+//! # fn main() {}
 //! ```
 
 mod error;
@@ -60,7 +66,7 @@ extern crate alloc;
 ///
 /// When the `ffi` feature is enabled, a C header file (`webhookkit.h`) is
 /// generated at build time in the crate's `OUT_DIR`. The header declares
-/// [`webhookkit_verify_hmac_sha256`] and [`webhookkit_version`] with
+/// [`ffi::webhookkit_verify_hmac_sha256`] and [`ffi::webhookkit_version`] with
 /// standard C linkage.
 ///
 /// To locate the header at build time:
@@ -123,7 +129,7 @@ pub fn verify_hmac_sha256(
 #[cfg(test)]
 // Test-only helper: HMAC accepts any key size, so this cannot fail.
 #[allow(clippy::expect_used)]
-pub(crate) fn compute_hmac_sha256(payload: &[u8], secret: &[u8]) -> String {
+pub(crate) fn compute_hmac_sha256(payload: &[u8], secret: &[u8]) -> alloc::string::String {
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
     type HmacSha256 = Hmac<Sha256>;
@@ -162,7 +168,7 @@ mod proptests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 // Test code: unwrap is the idiomatic way to assert outcomes.
 #[allow(clippy::unwrap_used)]
 mod tests {

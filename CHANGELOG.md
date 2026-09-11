@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Format: [Keep a
 Changelog](https://keepachangelog.com/) — versions follow [semver](https://semver.org).
 
+## [1.1.1] - 2026-09-09
+
+### Fixed
+- `RedisReplayGuard` is re-exported at the crate root and correctly
+  gated behind the `redis` feature (the export previously leaked
+  without the feature enabled, breaking `--no-default-features`
+  builds).
+- `build.rs` panics now carry context messages instead of failing
+  silently; lint allowances added for the test suite under
+  `-D warnings`.
+
 ## [1.1.0] - 2026-09-09
 
 ### Added

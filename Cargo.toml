@@ -17,14 +17,12 @@ sha2 = { version = "0.10", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 subtle = { version = "2", default-features = false }
 thiserror = { version = "2", default-features = false }
-serde = { version = "1", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 redis = { version = "0.27", default-features = false, features = ["tokio-comp", "connection-manager"], optional = true }
-tokio = { version = "1", optional = true }
 
 [features]
 default = ["std", "hmac-sha256"]
-redis = ["dep:redis", "dep:tokio"]
+redis = ["dep:redis"]
 # Core-only build: stateless HMAC verification, GoCardless parsing, and the
 # `ffi` surface need no std. `timestamp`/`replay`/`stripe` need a wall clock
 # (SystemTime) and/or std Mutex, so they require `std`.
