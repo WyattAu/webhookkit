@@ -12,7 +12,7 @@ categories = ["web-programming"]
 exclude = ["/target"]
 
 [dependencies]
-hmac = { version = "0.12", default-features = false }
+hmac = { version = "0.13", default-features = false }
 sha2 = { version = "0.10", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 subtle = { version = "2", default-features = false }
@@ -33,7 +33,7 @@ ffi = []
 [dev-dependencies]
 proptest = "1"
 # integration.rs signing helpers (mirror the runtime crypto stack).
-hmac = "0.12"
+hmac = "0.13"
 sha2 = "0.10"
 hex = "0.4"
 # redis_replay.rs: a throwaway Redis per test run (docker).
