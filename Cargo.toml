@@ -38,7 +38,7 @@ sha2 = "0.10"
 hex = "0.4"
 # redis_replay.rs: a throwaway Redis per test run (docker).
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
-testcontainers = "0.23"
+testcontainers = "0.24"
 testcontainers-modules = { version = "0.11", features = ["redis"] }
 
 [[test]]
