@@ -47,7 +47,6 @@ pub fn verify_gocardless_webhook(
     })
 }
 
-#[allow(dead_code)]
 fn parse_gocardless_signature(header: &str) -> Result<String, WebhookError> {
     for part in header.split(',') {
         let mut kv = part.splitn(2, '=');

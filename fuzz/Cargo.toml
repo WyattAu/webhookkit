@@ -20,6 +20,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "fuzz_stripe_signature"
+path = "fuzz_targets/fuzz_stripe_signature.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "fuzz_verify"
 path = "fuzz_targets/fuzz_verify.rs"
 test = false

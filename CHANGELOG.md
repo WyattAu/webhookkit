@@ -3,6 +3,35 @@
 All notable changes to this project are documented here. Format: [Keep a
 Changelog](https://keepachangelog.com/) — versions follow [semver](https://semver.org).
 
+## [2.0.0] - 2026-09-15
+
+### Fixed (security)
+
+- **`ReplayGuard` no longer fails open at capacity.** The 1.1.0 guard
+  silently wiped every tracked event ID once the set exceeded 10,000
+  entries, re-opening a replay window exactly under load. Entries are now
+  tracked with insertion instants, expired entries are swept lazily
+  (every 1024 inserts and whenever at capacity), and a guard that is full
+  of still-fresh IDs fails **closed** with the new
+  `WebhookError::ReplayGuardFull` instead of forgetting seen IDs.
+- **Stripe signature verification accepts every `v1=` entry.** The parser
+  collapsed duplicate `v1=` values into a map, so during signing-secret
+  rotation (Stripe sends one `v1=` per active secret) legitimate webhooks
+  were rejected. All `v1=` signatures are now tried and any match verifies.
+- `WebhookError` is now `#[non_exhaustive]` ( breaking — matchers must add
+  a wildcard arm).
+- Removed incorrect `#[allow(dead_code)]` from used parser functions.
+
+### Added
+
+- `ReplayGuard::with_capacity(expiry, capacity)` and accessors
+  `capacity()` / `expiry()`; default capacity 65,536.
+- `verify_stripe_webhook_with_tolerance(body, sig, secret, tolerance_secs)`
+  — configurable timestamp tolerance (default 300s via
+  `verify_stripe_webhook`, now exposed as
+  `DEFAULT_STRIPE_TOLERANCE_SECS`).
+- Fuzz target `fuzz_stripe_signature` for the signature header parser.
+
 ## [1.1.2] - 2026-09-12
 
 ### Added

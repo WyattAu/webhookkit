@@ -335,18 +335,41 @@ mod tests {
     }
 
     #[test]
-    fn replay_guard_prunes_when_capacity_exceeded() {
-        let guard = ReplayGuard::new(Duration::from_secs(300));
-        for i in 0..10_000 {
+    fn replay_guard_fails_closed_at_capacity() {
+        // Security regression: 1.1.0 silently wiped the whole set once it
+        // exceeded 10,000 entries (replay window reopened under load).
+        // The guard must now sweep expired entries and reject new claims
+        // while every tracked ID is still fresh.
+        let guard = ReplayGuard::with_capacity(Duration::from_secs(300), 128);
+        for i in 0..128 {
             assert!(guard.check(&format!("evt-{i}")).is_ok());
         }
-        assert_eq!(guard.len(), 10_000);
-        // One entry over the cap is still accepted...
-        assert!(guard.check("evt-overflow").is_ok());
-        assert_eq!(guard.len(), 10_001);
-        // ...and the next check trips the size cap and clears the set.
-        assert!(guard.check("evt-0").is_ok());
-        assert_eq!(guard.len(), 1);
+        assert_eq!(guard.len(), 128);
+        // At capacity with all-fresh entries: reject, don't wipe.
+        assert!(matches!(
+            guard.check("evt-overflow"),
+            Err(WebhookError::ReplayGuardFull)
+        ));
+        assert_eq!(guard.len(), 128);
+        // Previously-seen IDs remain protected (no silent clear).
+        assert!(matches!(
+            guard.check("evt-0"),
+            Err(WebhookError::ReplayDetected)
+        ));
+        assert_eq!(guard.len(), 128);
+    }
+
+    #[test]
+    fn replay_guard_sweeps_expired_entries() {
+        // Zero expiry ⇒ everything is immediately prunable; the forced
+        // sweep at capacity must reclaim slots instead of filling up.
+        let guard = ReplayGuard::with_capacity(Duration::ZERO, 4);
+        for round in 0..8 {
+            assert!(
+                guard.check(&format!("evt-round{round}")).is_ok(),
+                "round {round}: capacity should be reclaimed by sweeping"
+            );
+        }
     }
 
     #[test]

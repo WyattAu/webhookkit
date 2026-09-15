@@ -299,19 +299,28 @@ fn replay_guard_full_pipeline_rejects_replayed_webhooks() {
 }
 
 #[test]
-fn replay_guard_remove_reopens_window_and_capacity_prunes() {
+fn replay_guard_remove_reopens_window_and_capacity_fails_closed() {
     let guard = ReplayGuard::new(Duration::from_secs(300));
     guard.check("evt_X").unwrap();
     guard.remove("evt_X");
     assert!(guard.is_empty());
     assert!(guard.check("evt_X").is_ok(), "removal re-allows the id");
 
-    // Capacity path clears the set rather than growing unbounded.
-    for i in 0..10_001 {
-        let _ = guard.check(&format!("flood-{i}"));
+    // Security regression (2.0.0): at capacity the guard fails CLOSED.
+    // 1.1.0 silently wiped the set here, re-opening a replay window under
+    // load. Now: fresh IDs are never forgotten; overflow claims are
+    // rejected with ReplayGuardFull and seen IDs stay protected.
+    let capped = ReplayGuard::with_capacity(Duration::from_secs(300), 64);
+    for i in 0..64 {
+        capped.check(&format!("flood-{i}")).unwrap();
     }
-    assert!(
-        guard.len() <= 10_001,
-        "guard must not grow past the cap + 1"
-    );
+    assert!(matches!(
+        capped.check("flood-overflow"),
+        Err(WebhookError::ReplayGuardFull)
+    ));
+    assert!(matches!(
+        capped.check("flood-0"),
+        Err(WebhookError::ReplayDetected),
+    ));
+    assert_eq!(capped.len(), 64, "guard must not forget seen ids");
 }
