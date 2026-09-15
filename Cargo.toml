@@ -1,6 +1,6 @@
 [package]
 name = "webhookkit"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -32,6 +32,18 @@ ffi = []
 
 [dev-dependencies]
 proptest = "1"
+# integration.rs signing helpers (mirror the runtime crypto stack).
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+# redis_replay.rs: a throwaway Redis per test run (docker).
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+testcontainers = "0.23"
+testcontainers-modules = { version = "0.11", features = ["redis"] }
+
+[[test]]
+name = "redis_replay"
+required-features = ["redis"]
 
 [lints.clippy]
 unwrap_used = "warn"

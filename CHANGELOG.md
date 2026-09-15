@@ -3,6 +3,30 @@
 All notable changes to this project are documented here. Format: [Keep a
 Changelog](https://keepachangelog.com/) — versions follow [semver](https://semver.org).
 
+## [1.1.2] - 2026-09-12
+
+### Added
+
+- Adversarial signature-verification integration suite
+  (`tests/integration.rs`, 17 tests): forged signatures, tampered
+  payloads and signatures (same-length flips), wrong-length signatures
+  failing closed with the identical error (no length oracle),
+  non-hex parse errors, Stripe header formats, expired/future timestamp
+  rejection (the replay window), GoCardless round trip and rejections,
+  `ReplayGuard` dedup/remove/capacity semantics, and the full
+  verify-then-dedup pipeline rejecting replayed webhook deliveries.
+- Distributed replay-guard suite (`tests/redis_replay.rs`, 6 tests)
+  against a real Redis spun up per run with testcontainers: atomic
+  `SET NX EX` claims across separate guard instances (shared worker
+  state), first-claim-wins, distinct-id independence, window expiry
+  re-admission, minimum-1s TTL enforcement, and the two-layer
+  verify + dedup pipeline end to end.
+
+### CI
+
+- New `integration` job running the verification suite, the redis replay
+  suite (testcontainers), and an `ffi` feature compile-check.
+
 ## [1.1.1] - 2026-09-09
 
 ### Fixed
