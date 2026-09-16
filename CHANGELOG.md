@@ -3,6 +3,48 @@
 All notable changes to this project are documented here. Format: [Keep a
 Changelog](https://keepachangelog.com/) — versions follow [semver](https://semver.org).
 
+## [2.1.0] - 2026-09-16
+
+### Changed
+
+- **`ReplayGuard` and `RedisReplayGuard` are re-expressed over
+  [`idempotency-kit`](https://crates.io/crates/idempotency-kit) — the
+  estate's single claim primitive — replacing webhookkit's private
+  HashMap+Mutex bookkeeping. The public API is unchanged** (constructors,
+  `check`/`remove`/`len`/`is_empty`/`capacity`/`expiry`,
+  `DEFAULT_REPLAY_CAPACITY`, `WebhookError` variants), and the full unit,
+  integration, and Redis (testcontainers) suites pass without
+  modification: the proof of equivalence.
+  - Fail-closed capacity semantics are now inherited from
+    `idempotency-kit`'s memory store (`StoreError::CapacityExceeded` →
+    `WebhookError::ReplayGuardFull`), with the same sweep cadence as
+    before: every 1,024 inserts, forced at capacity. webhookkit no longer
+    owns TTL-sweep or capacity code.
+  - Claim mapping: `Claim::First` → `Ok(())`; `Claim::InFlight` and
+    `Claim::Replay(_)` → `ReplayDetected`. An unfinished claim means the
+    event was already accepted within the window — webhook dedup has no
+    response-replay stage, so this differs from `idempotency-kit`'s
+    executor semantics (where `InFlight` is retryable).
+  - The memory guard's expiry window is now measured from the first
+    claim of an event ID, matching the Redis guard's `SET NX EX`
+    behavior (2.0.0's memory guard re-armed the window on duplicate
+    checks). An internal unification; not observable through the API.
+  - `RedisReplayGuard` keys are now `idempotency-kit:webhook:{blake3}`
+    (BLAKE3 of the event ID) instead of `webhookkit:replay:{event_id}`:
+    raw event IDs no longer appear in Redis, and webhook dedup state
+    interoperates with `idempotency-kit::RedisStore` under the `webhook`
+    scope. 2.0.0 Redis state is not migrated — event IDs seen in the
+    final window of a 2.0.0 deployment may be delivered once more after
+    upgrading.
+  - Public auto-trait surface is preserved: the guard is still
+    `RefUnwindSafe` (explicitly re-asserted over the new store
+    internals, with the soundness rationale documented at the impl).
+  - New optional dependency `idempotency-kit = "0.1"` (memory store under
+    `std`, Redis store under `redis`). The `redis` feature keeps
+    webhookkit's own `redis` 0.27 dependency for the `ConnectionManager`
+    constructor parameter; the version is aligned with idempotency-kit's,
+    so one `redis` is compiled into the graph.
+
 ## [2.0.0] - 2026-09-15
 
 ### Fixed (security)

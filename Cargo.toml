@@ -1,6 +1,6 @@
 [package]
 name = "webhookkit"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -19,14 +19,23 @@ subtle = { version = "2", default-features = false }
 thiserror = { version = "2", default-features = false }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 redis = { version = "0.27", default-features = false, features = ["tokio-comp", "connection-manager"], optional = true }
+# Replay-guard storage: the estate's single claim primitive. The memory
+# store backs `ReplayGuard` (under `std`); the Redis store backs
+# `RedisReplayGuard` (under `redis`). Optional and feature-activated so
+# the no_std core never pulls it.
+idempotency-kit = { version = "0.1", default-features = false, optional = true }
 
 [features]
 default = ["std", "hmac-sha256"]
-redis = ["dep:redis"]
+# webhookkit keeps its own `redis` dependency for the `ConnectionManager`
+# constructor parameter; the same 0.27 line as idempotency-kit's, so the
+# types unify in the graph.
+redis = ["dep:redis", "idempotency-kit/redis"]
 # Core-only build: stateless HMAC verification, GoCardless parsing, and the
 # `ffi` surface need no std. `timestamp`/`replay`/`stripe` need a wall clock
-# (SystemTime) and/or std Mutex, so they require `std`.
-std = []
+# (SystemTime) and/or std, so they require `std`; `replay` additionally
+# stores its claims in `idempotency-kit`'s `MemoryStore`.
+std = ["dep:idempotency-kit", "idempotency-kit/memory"]
 hmac-sha256 = []
 ffi = []
 

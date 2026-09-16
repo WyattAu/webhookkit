@@ -17,7 +17,8 @@
 //!   you, with constant-time comparison (`subtle`).
 //! - **Replay protection.** [`ReplayGuard`] tracks processed event IDs with
 //!   a TTL window, so at-least-once delivery doesn't mean double side
-//!   effects.
+//!   effects — backed by [`idempotency-kit`](https://crates.io/crates/idempotency-kit)'s
+//!   claim stores, the estate's single dedup primitive.
 //!
 //! It is not a Stripe SDK (see `async-stripe` for the full Stripe REST API)
 //! and it does not send webhooks (see `svix` for outbound delivery) — it
@@ -29,7 +30,7 @@
 //! Stateless verification ([`verify_hmac_sha256`], GoCardless parsing, the
 //! `ffi` surface) builds core-only with `--no-default-features`. The
 //! `timestamp`, `replay`, and `stripe` modules require a wall clock / std
-//! mutex and are gated behind the `std` feature (on by default).
+//! and are gated behind the `std` feature (on by default).
 //!
 //! # Quick Start
 //!

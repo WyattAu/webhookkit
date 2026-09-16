@@ -1,28 +1,109 @@
-use std::collections::HashMap;
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
+//! Replay protection over the estate's single claim primitive,
+//! [`idempotency-kit`](https://crates.io/crates/idempotency-kit): an
+//! event ID is claimed under the `webhook` scope for the guard's expiry
+//! window, and any second claim inside that window is a replay.
+//!
+//! # Claim mapping (webhook semantics)
+//!
+//! | `idempotency-kit` outcome | webhookkit result |
+//! |---|---|
+//! | `Claim::First` | `Ok(())` — process the event |
+//! | `Claim::InFlight` (unfinished claim) | `Err(ReplayDetected)` |
+//! | `Claim::Replay(_)` (recorded response) | `Err(ReplayDetected)` |
+//! | `StoreError::CapacityExceeded` | `Err(ReplayGuardFull)` |
+//! | `StoreError::Backend(_)` | `Err(ParseError)` |
+//!
+//! `InFlight` deliberately maps to `ReplayDetected` — not to a retryable
+//! "concurrent request" outcome, as `idempotency-kit`'s
+//! `IdempotencyExecutor` would produce — because webhook dedup has no
+//! response-replay stage: these guards never call `complete`, so an
+//! unfinished claim is not "another worker is mid-execution, try again"
+//! but "this event ID was already accepted within the expiry window",
+//! i.e. an at-least-once redelivery. `Replay` is unreachable for the
+//! same reason (nothing ever records a response) but is mapped
+//! identically so the guard is total over `Claim`.
+//!
+//! TTL and fail-closed capacity semantics are owned by the store: the
+//! expiry window is measured from the first claim of an event ID, and a
+//! full store rejects new claims (`ReplayGuardFull`) rather than
+//! forgetting seen ones.
 
-/// Default capacity: 65,536 concurrently-tracked event IDs.
-pub const DEFAULT_REPLAY_CAPACITY: usize = 65_536;
+use std::future::Future;
+use std::task::{Context, Poll, Waker};
+use std::time::Duration;
 
-/// Prune sweep interval: a full expiry sweep runs at most once per this
-/// many inserts (a sweep is also forced whenever the guard is at capacity).
-const PRUNE_EVERY: usize = 1024;
+use idempotency_kit::{Claim, IdempotencyKey, IdempotencyStore, MemoryStore, StoreError};
 
-struct Inner {
-    /// event ID → insertion instant. An entry is expired once
-    /// `now - inserted >= expiry`.
-    seen: HashMap<String, Instant>,
-    inserts_since_sweep: usize,
+/// Scope every replay claim is derived under: keys are
+/// `webhook:{blake3(event_id)}`, interoperable with the rest of the
+/// estate claiming under the same scope.
+const SCOPE: &str = "webhook";
+
+/// Default capacity: 65,536 concurrently-tracked event IDs (the
+/// `idempotency-kit` memory store's default bound).
+pub const DEFAULT_REPLAY_CAPACITY: usize = idempotency_kit::DEFAULT_CAPACITY;
+
+/// Derive the claim key for an event ID. The `"webhook"` scope is a
+/// compile-time constant satisfying the `[a-z0-9_.-]{1,64}` key-scope
+/// grammar, so derivation cannot fail; the error mapping is kept total
+/// regardless.
+fn claim_key(event_id: &str) -> Result<IdempotencyKey, crate::WebhookError> {
+    IdempotencyKey::derive(SCOPE, event_id.as_bytes())
+        .map_err(|e| crate::WebhookError::ParseError(e.to_string()))
+}
+
+/// Map a store claim outcome onto the webhook error surface (see the
+/// module docs for the rationale).
+fn claim_outcome(outcome: Result<Claim, StoreError>) -> Result<(), crate::WebhookError> {
+    match outcome {
+        Ok(Claim::First) => Ok(()),
+        // Any live claim on an event ID — unfinished or holding a
+        // recorded response — is a replay in webhook semantics.
+        Ok(Claim::InFlight | Claim::Replay(_)) => Err(crate::WebhookError::ReplayDetected),
+        // Fail closed: the store is full of still-fresh claims and
+        // refuses the new one rather than evicting a seen ID.
+        Err(StoreError::CapacityExceeded) => Err(crate::WebhookError::ReplayGuardFull),
+        Err(StoreError::Backend(msg)) => Err(crate::WebhookError::ParseError(msg)),
+        // `StoreError` is `#[non_exhaustive]`: future store failures are
+        // plumbing diagnostics, mapped onto the existing parse-error
+        // surface like the 2.0.0 guard mapped lock poisoning.
+        Err(other) => Err(crate::WebhookError::ParseError(other.to_string())),
+    }
+}
+
+/// Drive a store future to completion on the calling thread.
+///
+/// The memory store's futures are synchronous bodies wrapped by
+/// `#[async_trait]` — they never park — so a poll-to-completion loop
+/// with a no-op waker adapts them to the sync [`ReplayGuard`] API
+/// without pulling in an executor. (The Redis guard is async natively
+/// and simply `.await`s the same contract.)
+fn wait<F: Future>(fut: F) -> F::Output {
+    let waker = Waker::noop();
+    let mut cx = Context::from_waker(waker);
+    let mut fut = std::pin::pin!(fut);
+    loop {
+        match fut.as_mut().poll(&mut cx) {
+            Poll::Ready(out) => return out,
+            // Defensive: the memory store never yields. Yielding the
+            // thread keeps this correct (if inefficient) even if a
+            // future store implementation parks.
+            Poll::Pending => std::thread::yield_now(),
+        }
+    }
 }
 
 /// Guards against replay attacks by tracking processed event IDs with a
 /// TTL window.
 ///
+/// Backed by `idempotency-kit`'s `MemoryStore` — the same claim
+/// primitive as the rest of the estate — with webhook-specific claim
+/// mapping (see the [module docs](self)).
+///
 /// # Semantics (fail-closed)
 ///
-/// - Expired entries are pruned lazily: a sweep runs every [`PRUNE_EVERY`]
-///   inserts, and is forced whenever the guard is at capacity.
+/// - Expired entries are pruned lazily by the store: a sweep runs every
+///   1,024 inserts, and is forced whenever the store is at capacity.
 /// - If the guard is at [`capacity`](Self::capacity) and every tracked ID
 ///   is still inside its expiry window, [`check`](Self::check) returns
 ///   [`WebhookError::ReplayGuardFull`] rather than forgetting IDs.
@@ -32,9 +113,8 @@ struct Inner {
 ///   [`RedisReplayGuard`], which shares dedup state atomically via
 ///   `SET NX EX`.
 pub struct ReplayGuard {
-    inner: Mutex<Inner>,
+    store: MemoryStore,
     expiry: Duration,
-    capacity: usize,
 }
 
 impl ReplayGuard {
@@ -47,18 +127,14 @@ impl ReplayGuard {
     /// Create a replay guard with an explicit capacity bound (minimum 1).
     pub fn with_capacity(expiry: Duration, capacity: usize) -> Self {
         Self {
-            inner: Mutex::new(Inner {
-                seen: HashMap::new(),
-                inserts_since_sweep: 0,
-            }),
+            store: MemoryStore::with_capacity(capacity),
             expiry,
-            capacity: capacity.max(1),
         }
     }
 
     /// The configured capacity bound.
     pub fn capacity(&self) -> usize {
-        self.capacity
+        self.store.capacity()
     }
 
     /// The configured expiry window.
@@ -73,100 +149,76 @@ impl ReplayGuard {
     /// inside the expiry window. Returns `Err(ReplayGuardFull)` when at
     /// capacity with no prunable entries (see type docs).
     pub fn check(&self, event_id: &str) -> Result<(), crate::WebhookError> {
-        let mut inner = self
-            .inner
-            .lock()
-            .map_err(|e| crate::WebhookError::ParseError(e.to_string()))?;
-
-        inner.inserts_since_sweep += 1;
-        let sweep_due =
-            inner.inserts_since_sweep >= PRUNE_EVERY || inner.seen.len() >= self.capacity;
-        if sweep_due {
-            sweep_expired(&mut inner.seen, self.expiry);
-            inner.inserts_since_sweep = 0;
-        }
-
-        // Fail closed: at capacity with all-fresh entries, reject the new
-        // claim instead of forgetting a previously-seen ID.
-        if !inner.seen.contains_key(event_id) && inner.seen.len() >= self.capacity {
-            return Err(crate::WebhookError::ReplayGuardFull);
-        }
-
-        if inner
-            .seen
-            .insert(event_id.to_string(), Instant::now())
-            .is_some()
-        {
-            return Err(crate::WebhookError::ReplayDetected);
-        }
-
-        Ok(())
+        let key = claim_key(event_id)?;
+        claim_outcome(wait(self.store.claim(&key, self.expiry)))
     }
 
     /// Manually remove an event ID (e.g. after its expiry window passes).
     pub fn remove(&self, event_id: &str) {
-        if let Ok(mut inner) = self.inner.lock() {
-            inner.seen.remove(event_id);
+        // Best-effort by contract: a failed release is swallowed exactly
+        // as a poisoned lock always was.
+        if let Ok(key) = claim_key(event_id) {
+            let _ = wait(self.store.release(&key));
         }
     }
 
     /// Return the number of tracked event IDs (may include not-yet-pruned
     /// expired entries).
     pub fn len(&self) -> usize {
-        self.inner.lock().map(|i| i.seen.len()).unwrap_or(0)
+        self.store.len()
     }
 
     /// Whether no events are being tracked.
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.store.is_empty()
     }
 }
 
-fn sweep_expired(seen: &mut HashMap<String, Instant>, expiry: Duration) {
-    let now = Instant::now();
-    seen.retain(|_, inserted_at| now.duration_since(*inserted_at) < expiry);
-}
+// Restore the 2.0.0 auto-trait surface: the memory store's `DashMap`
+// internals opt this wrapper out of `RefUnwindSafe`, which would be an
+// unintended breaking change for downstream generic code. The assertion
+// is sound here: a panic through `&self` cannot break the guard's
+// invariants — shard locks release on unwind, entries are plain data (a
+// deadline), and no user code runs inside the store's critical
+// sections — so a `&ReplayGuard` captured across `catch_unwind` keeps
+// behaving per contract after a panic.
+impl std::panic::RefUnwindSafe for ReplayGuard {}
+
+// Pin the guarantee: the semver gate compares auto traits against the
+// 2.0.0 baseline.
+const fn assert_ref_unwind_safe<T: std::panic::RefUnwindSafe>() {}
+const _: () = assert_ref_unwind_safe::<ReplayGuard>();
 
 /// Distributed replay guard backed by Redis `SET key val NX EX` — an atomic
 /// claim, so multi-instance deployments share dedup state without Lua.
 ///
-/// Unlike the in-memory [`ReplayGuard`], expiry is enforced by Redis TTLs
-/// rather than lazy pruning.
+/// Delegates to `idempotency-kit`'s `RedisStore`: keys are
+/// `idempotency-kit:webhook:{blake3(event_id)}` — raw event IDs never
+/// appear in Redis — and dedup state is shared with any other estate
+/// component claiming under the `webhook` scope. Unlike the in-memory
+/// [`ReplayGuard`], expiry is enforced by Redis TTLs rather than lazy
+/// pruning, with the TTL floored at one second.
 #[cfg(feature = "redis")]
 pub struct RedisReplayGuard {
-    conn: redis::aio::ConnectionManager,
-    ttl_secs: i64,
+    store: idempotency_kit::RedisStore,
+    expiry: Duration,
 }
 
 #[cfg(feature = "redis")]
 impl RedisReplayGuard {
     /// Create a distributed replay guard with the given expiry window.
-    pub fn new(conn: redis::aio::ConnectionManager, expiry: std::time::Duration) -> Self {
+    pub fn new(conn: redis::aio::ConnectionManager, expiry: Duration) -> Self {
         Self {
-            conn,
-            ttl_secs: expiry.as_secs().max(1) as i64,
+            store: idempotency_kit::RedisStore::new(conn),
+            expiry,
         }
     }
 
     /// Atomically claim `event_id`. Returns `Err(ReplayDetected)` if another
     /// worker already claimed it within the expiry window.
     pub async fn check(&self, event_id: &str) -> Result<(), crate::WebhookError> {
-        let key = format!("webhookkit:replay:{event_id}");
-        let mut conn = self.conn.clone();
-        let claimed: Option<String> = redis::cmd("SET")
-            .arg(&key)
-            .arg(1)
-            .arg("NX")
-            .arg("EX")
-            .arg(self.ttl_secs)
-            .query_async(&mut conn)
-            .await
-            .map_err(|e| crate::WebhookError::ParseError(e.to_string()))?;
-
-        if claimed.is_none() {
-            return Err(crate::WebhookError::ReplayDetected);
-        }
-        Ok(())
+        let key = claim_key(event_id)?;
+        claim_outcome(self.store.claim(&key, self.expiry).await)
     }
 }
 

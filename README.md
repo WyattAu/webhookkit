@@ -52,8 +52,9 @@ it next to — not against — two crates it's often compared with:
   webhookkit only consumes inbound webhooks.
 - **Two providers, not fifty.** Stripe and GoCardless today. The raw
   `verify_hmac_sha256` path covers anything with an HMAC-SHA256 scheme.
-- **Single-process `ReplayGuard`.** It's an in-memory std mutex; multi-instance
-  deployments should front it with a shared store.
+- **Single-process `ReplayGuard`.** Claims live in an in-process
+  `idempotency-kit` store; multi-instance deployments should front it with
+  a shared store.
 
 ## Quick Start
 
