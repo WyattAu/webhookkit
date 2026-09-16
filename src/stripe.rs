@@ -123,7 +123,7 @@ fn parse_stripe_signature(header: &str) -> Result<(String, Vec<String>), Webhook
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
-    use hmac::{Hmac, Mac};
+    use hmac::{Hmac, KeyInit, Mac};
     use sha2::Sha256;
 
     fn sign(timestamp: &str, body: &str, secret: &str) -> String {

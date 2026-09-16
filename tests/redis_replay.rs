@@ -14,6 +14,7 @@
 //! (i.e. separate service workers), replay rejection within the window,
 //! and window expiry re-admitting the event id.
 
+use hmac::KeyInit;
 use std::time::Duration;
 
 use testcontainers::runners::AsyncRunner;

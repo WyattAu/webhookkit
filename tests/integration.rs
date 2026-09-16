@@ -17,7 +17,7 @@
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use webhookkit::{
     ReplayGuard, WebhookError, verify_gocardless_webhook, verify_hmac_sha256,
     verify_stripe_webhook, verify_timestamp,

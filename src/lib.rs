@@ -90,7 +90,7 @@ pub use stripe::{StripeEvent, verify_stripe_webhook};
 pub use timestamp::verify_timestamp;
 
 use alloc::string::ToString;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -130,7 +130,7 @@ pub fn verify_hmac_sha256(
 // Test-only helper: HMAC accepts any key size, so this cannot fail.
 #[allow(clippy::expect_used)]
 pub(crate) fn compute_hmac_sha256(payload: &[u8], secret: &[u8]) -> alloc::string::String {
-    use hmac::{Hmac, Mac};
+    use hmac::{Hmac, KeyInit, Mac};
     use sha2::Sha256;
     type HmacSha256 = Hmac<Sha256>;
     let mut mac = HmacSha256::new_from_slice(secret).expect("HMAC accepts any key size");
