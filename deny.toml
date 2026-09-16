@@ -7,6 +7,23 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
+ignore = [
+    # rustls-pemfile unmaintained (not a vulnerability; latest release is a
+    # thin wrapper over rustls-pki-types' PEM parsing, which is the intended
+    # successor). Dev-only: via bollard <- testcontainers (integration-test
+    # containers), so it is absent from every runtime graph. Fix belongs
+    # upstream in bollard; no in-range upgrade exists.
+    # TODO: drop when bollard drops rustls-pemfile.
+    "RUSTSEC-2025-0134",
+    # tokio-tar PAX extended-header confusion (file smuggling, not memory
+    # unsafety). Dev-only: via testcontainers (image layer extraction for
+    # integration-test containers); archives originate from trusted
+    # registries, not hostile input. tokio-tar is archived upstream and the
+    # fix (astral-tokio-tar) requires a testcontainers-side migration; no
+    # in-range upgrade exists.
+    # TODO: drop when testcontainers switches off tokio-tar.
+    "RUSTSEC-2025-0111",
+]
 
 [licenses]
 version = 2
