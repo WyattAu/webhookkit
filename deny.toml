@@ -37,6 +37,10 @@ allow = [
   "Unicode-3.0",
   "Zlib",
   "CDLA-Permissive-2.0",
+  # BSL-1.0 (Boost Software License — permissive, OSI-approved, FSF
+  # Free/Libre): `xxhash-rust` via redis >= 1.0 (internal xxhash
+  # re-implementation is dual MIT/BSL-1.0). Restriction-free.
+  "BSL-1.0",
 ]
 confidence-threshold = 0.93
 
