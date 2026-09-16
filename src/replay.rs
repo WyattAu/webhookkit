@@ -98,7 +98,7 @@ fn wait<F: Future>(fut: F) -> F::Output {
 ///
 /// Backed by `idempotency-kit`'s `MemoryStore` — the same claim
 /// primitive as the rest of the estate — with webhook-specific claim
-/// mapping (see the [module docs](self)).
+/// mapping; see the module docs.
 ///
 /// # Semantics (fail-closed)
 ///
@@ -119,7 +119,8 @@ pub struct ReplayGuard {
 
 impl ReplayGuard {
     /// Create a replay guard with the given expiry window and the default
-    /// capacity of [`DEFAULT_REPLAY_CAPACITY`].
+    /// capacity of 65,536 (matching `idempotency-kit`'s default store
+    /// bound).
     pub fn new(expiry: Duration) -> Self {
         Self::with_capacity(expiry, DEFAULT_REPLAY_CAPACITY)
     }
