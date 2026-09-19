@@ -3,6 +3,32 @@
 All notable changes to this project are documented here. Format: [Keep a
 Changelog](https://keepachangelog.com/) — versions follow [semver](https://semver.org).
 
+## [2.2.0] - 2026-09-19
+
+### Added
+
+- **Public signing helpers** — the counterparts of every verify path, so
+  hosts can build genuine test fixtures (faked provider deliveries,
+  replay suites) without mirroring the crypto stack in
+  `[dev-dependencies]`:
+  - `sign_payload(payload, secret) -> String`: lowercase-hex HMAC-SHA256,
+    the signing twin of [`verify_hmac_sha256`]. Core-only like its
+    counterpart — available under `--no-default-features`.
+  - `sign_stripe_timestamped(timestamp, body, secret) -> String`: the
+    Stripe `v1=` value (HMAC-SHA256 over `"{timestamp}.{body}"`), for
+    composing `t=…,v1=…` header fixtures that
+    [`verify_stripe_webhook`](https://docs.rs/webhookkit) accepts. Under
+    the `std` feature, matching the stripe module.
+- Both helpers re-use the crate's internal HMAC path; constant-time
+  verification is unchanged.
+
+### Changed
+
+- webhookkit's own integration and Redis suites now sign their fixtures
+  through the new public API, and the `hmac`/`sha2`/`hex`
+  dev-dependencies are gone — the API is sufficient for its tests, which
+  is the point.
+
 ## [2.1.0] - 2026-09-16
 
 ### Changed

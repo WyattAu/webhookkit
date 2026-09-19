@@ -1,6 +1,6 @@
 [package]
 name = "webhookkit"
-version = "2.1.0"
+version = "2.2.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -41,10 +41,6 @@ ffi = []
 
 [dev-dependencies]
 proptest = "1"
-# integration.rs signing helpers (mirror the runtime crypto stack).
-hmac = "0.13"
-sha2 = "0.11"
-hex = "0.4"
 # redis_replay.rs: a throwaway Redis per test run (docker).
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 testcontainers = "0.24"

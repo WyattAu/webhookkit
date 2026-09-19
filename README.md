@@ -108,6 +108,25 @@ fn verify(payload: &[u8], secret: &[u8], sig_hex: &[u8]) -> Result<(), WebhookEr
 }
 ```
 
+### Signing Fixtures for Tests
+
+Every verify path has a signing counterpart, so tests can produce
+genuine signatures without `hmac`/`sha2` dev-dependencies:
+
+```rust
+use webhookkit::{sign_payload, sign_stripe_timestamped, verify_stripe_webhook};
+
+// Raw HMAC-SHA256 (hex) — GoCardless `hex=…`, custom schemes, no_std:
+let hex_sig = sign_payload(payload, secret);
+
+// Stripe: the v1= value over "{timestamp}.{body}" —
+// compose the header as t={timestamp},v1={signature}:
+let timestamp = "1700000000";
+let v1 = sign_stripe_timestamped(timestamp, body, "whsec_test");
+let header = format!("t={timestamp},v1={v1}");
+verify_stripe_webhook(body, &header, "whsec_test")?;
+```
+
 ## How It Works
 
 ```

@@ -128,7 +128,7 @@ mod tests {
     fn ffi_valid_signature_returns_one() {
         let payload = CString::new("hello world").unwrap();
         let secret = CString::new("my-secret").unwrap();
-        let sig = CString::new(crate::compute_hmac_sha256(b"hello world", b"my-secret")).unwrap();
+        let sig = CString::new(crate::sign_payload(b"hello world", b"my-secret")).unwrap();
         let (p, pl, s, sl, g, gl) = args(&payload, &secret, &sig);
         assert_eq!(call_ffi(p, pl, s, sl, g, gl), 1);
     }
@@ -137,7 +137,7 @@ mod tests {
     fn ffi_tampered_payload_returns_zero() {
         let payload = CString::new("hello tampered").unwrap();
         let secret = CString::new("my-secret").unwrap();
-        let sig = CString::new(crate::compute_hmac_sha256(b"hello world", b"my-secret")).unwrap();
+        let sig = CString::new(crate::sign_payload(b"hello world", b"my-secret")).unwrap();
         let (p, pl, s, sl, g, gl) = args(&payload, &secret, &sig);
         assert_eq!(call_ffi(p, pl, s, sl, g, gl), 0);
     }

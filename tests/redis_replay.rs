@@ -14,7 +14,6 @@
 //! (i.e. separate service workers), replay rejection within the window,
 //! and window expiry re-admitting the event id.
 
-use hmac::KeyInit;
 use std::time::Duration;
 
 use testcontainers::runners::AsyncRunner;
@@ -115,8 +114,10 @@ async fn minimum_one_second_ttl_is_enforced() {
 #[tokio::test]
 async fn realistic_webhook_pipeline_end_to_end() {
     // Signature verification (stateless) + distributed replay guard,
-    // mirroring the documented two-layer consumption flow.
-    use hmac::Mac as _;
+    // mirroring the documented two-layer consumption flow. The fixture
+    // signature comes from the crate's own public signing helper — no
+    // `hmac`/`sha2` dev-deps mirror needed.
+    use webhookkit::sign_payload;
     use webhookkit::verify_hmac_sha256;
 
     let (_c, conn) = spawn_redis().await;
@@ -126,9 +127,7 @@ async fn realistic_webhook_pipeline_end_to_end() {
     let event_id = "evt_pipeline_1";
     let payload = format!(r#"{{"id":"{event_id}","type":"payout.paid"}}"#);
 
-    let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(secret).unwrap();
-    mac.update(payload.as_bytes());
-    let sig = hex::encode(mac.finalize().into_bytes());
+    let sig = sign_payload(payload.as_bytes(), secret);
 
     // Delivery 1: valid signature, fresh id → processed.
     verify_hmac_sha256(payload.as_bytes(), secret, sig.as_bytes()).unwrap();

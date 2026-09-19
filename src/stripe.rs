@@ -72,6 +72,40 @@ pub fn verify_stripe_webhook_with_tolerance(
     })
 }
 
+/// Compute the `v1=` signature value for a Stripe webhook delivery:
+/// HMAC-SHA256 over `"{timestamp}.{body}"`, keyed with the signing secret,
+/// hex-encoded — exactly what [`verify_stripe_webhook`] recomputes on the
+/// receiving side.
+///
+/// Compose the `Stripe-Signature` header as `t={timestamp},v1={signature}`
+/// (unix seconds for the timestamp, matching Stripe's senders):
+///
+/// ```
+/// use webhookkit::{sign_stripe_timestamped, verify_stripe_webhook};
+///
+/// let body = r#"{"type":"payment_intent.succeeded"}"#;
+/// let timestamp = std::time::SystemTime::now()
+///     .duration_since(std::time::UNIX_EPOCH)
+///     .expect("clock")
+///     .as_secs()
+///     .to_string();
+///
+/// let v1 = sign_stripe_timestamped(&timestamp, body, "whsec_test");
+/// let header = format!("t={timestamp},v1={v1}");
+///
+/// // A receiver verifies the delivery you just built:
+/// let event = verify_stripe_webhook(body, &header, "whsec_test").unwrap();
+/// assert_eq!(event.event_type, "payment_intent.succeeded");
+/// ```
+///
+/// This is the test-fixture counterpart of verification: consuming hosts
+/// can fake genuine Stripe deliveries without an `hmac`/`sha2`
+/// `[dev-dependencies]` mirror of the crypto stack.
+pub fn sign_stripe_timestamped(timestamp: &str, body: &str, secret: &str) -> String {
+    let signed_payload = format!("{timestamp}.{body}");
+    crate::sign_payload(signed_payload.as_bytes(), secret.as_bytes())
+}
+
 /// Parse a `Stripe-Signature` header into the timestamp and the ordered
 /// list of `v1=` signatures.
 ///
@@ -123,14 +157,6 @@ fn parse_stripe_signature(header: &str) -> Result<(String, Vec<String>), Webhook
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
-    use hmac::{Hmac, KeyInit, Mac};
-    use sha2::Sha256;
-
-    fn sign(timestamp: &str, body: &str, secret: &str) -> String {
-        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("hmac key");
-        mac.update(format!("{timestamp}.{body}").as_bytes());
-        hex::encode(mac.finalize().into_bytes())
-    }
 
     const BODY: &str = r#"{"id":"evt_1","type":"payment_intent.succeeded"}"#;
 
@@ -147,7 +173,7 @@ mod tests {
     #[test]
     fn single_signature_verifies() {
         let t = now_secs();
-        let sig = sign(&t, BODY, "whsec_test");
+        let sig = sign_stripe_timestamped(&t, BODY, "whsec_test");
         let event = verify_stripe_webhook_with_tolerance(
             BODY,
             &format!("t={t},v1={sig}"),
@@ -159,12 +185,31 @@ mod tests {
     }
 
     #[test]
+    fn sign_stripe_timestamped_roundtrips_through_verify() {
+        // The documented fixture flow: sign with the helper, compose the
+        // header, verify with the public verify fn.
+        let t = now_secs();
+        let v1 = sign_stripe_timestamped(&t, BODY, "whsec_test");
+        assert_eq!(v1.len(), 64, "v1 is the hex of a SHA-256 digest");
+        let event = verify_stripe_webhook(BODY, &format!("t={t},v1={v1}"), "whsec_test")
+            .expect("signed header must verify");
+        assert_eq!(event.event_type, "payment_intent.succeeded");
+
+        // Bound to the exact secret and timestamp: neither may drift.
+        assert!(verify_stripe_webhook(BODY, &format!("t={t},v1={v1}"), "whsec_other").is_err());
+        let drifted = t.parse::<u64>().expect("secs") + 1;
+        assert!(
+            verify_stripe_webhook(BODY, &format!("t={drifted},v1={v1}"), "whsec_test").is_err()
+        );
+    }
+
+    #[test]
     fn rotated_secret_second_v1_verifies() {
         // Stripe sends one v1 per active signing secret; the request is
         // signed with the NEW secret while the receiver still knows both.
         let t = now_secs();
-        let old_sig = sign(&t, BODY, "whsec_old");
-        let new_sig = sign(&t, BODY, "whsec_new");
+        let old_sig = sign_stripe_timestamped(&t, BODY, "whsec_old");
+        let new_sig = sign_stripe_timestamped(&t, BODY, "whsec_new");
         let header = format!("t={t},v1={old_sig},v1={new_sig}");
         // The old single-v1 parser dropped `new_sig`; this must verify now.
         verify_stripe_webhook_with_tolerance(BODY, &header, "whsec_new", 3600)
@@ -177,7 +222,7 @@ mod tests {
     #[test]
     fn none_of_the_v1_signatures_match() {
         let t = now_secs();
-        let sig = sign(&t, BODY, "whsec_other");
+        let sig = sign_stripe_timestamped(&t, BODY, "whsec_other");
         let err = verify_stripe_webhook_with_tolerance(
             BODY,
             &format!("t={t},v1={sig}"),
@@ -191,7 +236,7 @@ mod tests {
     #[test]
     fn tampered_body_rejected() {
         let t = now_secs();
-        let sig = sign(&t, BODY, "whsec_test");
+        let sig = sign_stripe_timestamped(&t, BODY, "whsec_test");
         let err = verify_stripe_webhook_with_tolerance(
             r#"{"id":"evt_1","type":"charge.refunded"}"#,
             &format!("t={t},v1={sig}"),
@@ -211,7 +256,7 @@ mod tests {
 
     #[test]
     fn missing_timestamp_is_parse_error() {
-        let sig = sign(&now_secs(), BODY, "whsec_test");
+        let sig = sign_stripe_timestamped(&now_secs(), BODY, "whsec_test");
         let err =
             verify_stripe_webhook_with_tolerance(BODY, &format!("v1={sig}"), "whsec_test", 3600)
                 .expect_err("missing t");
@@ -221,7 +266,7 @@ mod tests {
     #[test]
     fn unknown_schemes_ignored_but_v1_still_required() {
         let t = now_secs();
-        let sig = sign(&t, BODY, "whsec_test");
+        let sig = sign_stripe_timestamped(&t, BODY, "whsec_test");
         let event = verify_stripe_webhook_with_tolerance(
             BODY,
             &format!("ho=host,t={t},v0=legacy,v1={sig}"),
@@ -242,7 +287,7 @@ mod tests {
             .as_secs()
             - 360;
         let t = past.to_string();
-        let sig = sign(&t, BODY, "whsec_test");
+        let sig = sign_stripe_timestamped(&t, BODY, "whsec_test");
         let header = format!("t={t},v1={sig}");
         assert!(verify_stripe_webhook(BODY, &header, "whsec_test").is_err());
         verify_stripe_webhook_with_tolerance(BODY, &header, "whsec_test", 600)
@@ -252,7 +297,7 @@ mod tests {
     #[test]
     fn whitespace_and_empty_parts_tolerated() {
         let t = now_secs();
-        let sig = sign(&t, BODY, "whsec_test");
+        let sig = sign_stripe_timestamped(&t, BODY, "whsec_test");
         verify_stripe_webhook_with_tolerance(
             BODY,
             &format!("t={t}, , v1={sig},"),

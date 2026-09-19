@@ -8,8 +8,9 @@
 //! three differentiators:
 //!
 //! - **A `no_std` verification core.** The stateless HMAC-SHA256 path
-//!   ([`verify_hmac_sha256`], GoCardless parsing, the `ffi` surface) builds
-//!   with `--no-default-features` on `core` + `alloc`, on top of RustCrypto
+//!   ([`verify_hmac_sha256`], its signing counterpart [`sign_payload`],
+//!   GoCardless parsing, the `ffi` surface) builds with
+//!   `--no-default-features` on `core` + `alloc`, on top of RustCrypto
 //!   `hmac`/`sha2` (both `no_std`); CI checks it against
 //!   `thumbv7em-none-eabihf`.
 //! - **Multi-provider support.** Signature formats for **Stripe**
@@ -24,6 +25,12 @@
 //! and it does not send webhooks (see `svix` for outbound delivery) — it
 //! sits strictly on the *consume-and-verify* side, including where those
 //! crates can't run: embedded and FFI.
+//!
+//! Every verify path has a signing counterpart for tests and fixtures —
+//! [`sign_payload`] (raw HMAC-SHA256, hex) and
+//! [`sign_stripe_timestamped`] (the Stripe `v1=` value) — so consuming
+//! hosts can build genuine signatures (faked provider deliveries, replay
+//! suites) without duplicating the crypto stack in `[dev-dependencies]`.
 //!
 //! # no_std
 //!
@@ -86,7 +93,7 @@ pub use replay::RedisReplayGuard;
 #[cfg(feature = "std")]
 pub use replay::ReplayGuard;
 #[cfg(feature = "std")]
-pub use stripe::{StripeEvent, verify_stripe_webhook};
+pub use stripe::{StripeEvent, sign_stripe_timestamped, verify_stripe_webhook};
 #[cfg(feature = "std")]
 pub use timestamp::verify_timestamp;
 
@@ -125,16 +132,36 @@ pub fn verify_hmac_sha256(
     }
 }
 
-/// Compute an HMAC-SHA256 signature and return it as a hex string.
-/// Used in tests to generate valid signatures.
-#[cfg(test)]
-// Test-only helper: HMAC accepts any key size, so this cannot fail.
-#[allow(clippy::expect_used)]
-pub(crate) fn compute_hmac_sha256(payload: &[u8], secret: &[u8]) -> alloc::string::String {
-    use hmac::{Hmac, KeyInit, Mac};
-    use sha2::Sha256;
-    type HmacSha256 = Hmac<Sha256>;
-    let mut mac = HmacSha256::new_from_slice(secret).expect("HMAC accepts any key size");
+/// Compute the HMAC-SHA256 of `payload` under `secret` and return it as a
+/// lowercase hex string — the signing counterpart of
+/// [`verify_hmac_sha256`].
+///
+/// This is the primitive behind every signature scheme in the crate: a
+/// signature is valid for exactly one `(payload, secret)` pair, so tests
+/// and fixtures can produce genuine signatures for any provider format
+/// without pulling `hmac`/`sha2` into `[dev-dependencies]` (Stripe's
+/// timestamped variant is [`sign_stripe_timestamped`]).
+///
+/// # Examples
+///
+/// Sign and verify round-trip:
+///
+/// ```
+/// use webhookkit::{sign_payload, verify_hmac_sha256};
+///
+/// let payload = br#"{"order":"created","amount":4200}"#;
+/// let secret = b"whsec_test";
+/// let signature = sign_payload(payload, secret);
+/// assert!(verify_hmac_sha256(payload, secret, signature.as_bytes()).is_ok());
+/// // Any other secret rejects it.
+/// assert!(verify_hmac_sha256(payload, b"wrong", signature.as_bytes()).is_err());
+/// ```
+pub fn sign_payload(payload: &[u8], secret: &[u8]) -> alloc::string::String {
+    // HMAC-SHA256 accepts keys of every length, so initialization cannot
+    // fail; the scoped allow documents that invariant.
+    #[allow(clippy::expect_used)]
+    let mut mac =
+        HmacSha256::new_from_slice(secret).expect("HMAC-SHA256 accepts keys of any length");
     mac.update(payload);
     hex::encode(mac.finalize().into_bytes())
 }
@@ -149,21 +176,21 @@ mod proptests {
     proptest! {
         #[test]
         fn hmac_sign_verify_roundtrip(key in "\\PC{1,256}", message in "\\PC{1,256}") {
-            let sig = compute_hmac_sha256(message.as_bytes(), key.as_bytes());
+            let sig = sign_payload(message.as_bytes(), key.as_bytes());
             prop_assert!(verify_hmac_sha256(message.as_bytes(), key.as_bytes(), sig.as_bytes()).is_ok());
         }
 
         #[test]
         fn verify_wrong_secret_fails(key1 in "\\PC{1,256}", key2 in "\\PC{1,256}", message in "\\PC{1,256}") {
             prop_assume!(key1 != key2);
-            let sig = compute_hmac_sha256(message.as_bytes(), key1.as_bytes());
+            let sig = sign_payload(message.as_bytes(), key1.as_bytes());
             prop_assert!(verify_hmac_sha256(message.as_bytes(), key2.as_bytes(), sig.as_bytes()).is_err());
         }
 
         #[test]
         fn verify_wrong_message_fails(key in "\\PC{1,256}", msg1 in "\\PC{1,256}", msg2 in "\\PC{1,256}") {
             prop_assume!(msg1 != msg2);
-            let sig = compute_hmac_sha256(msg1.as_bytes(), key.as_bytes());
+            let sig = sign_payload(msg1.as_bytes(), key.as_bytes());
             prop_assert!(verify_hmac_sha256(msg2.as_bytes(), key.as_bytes(), sig.as_bytes()).is_err());
         }
     }
@@ -181,8 +208,40 @@ mod tests {
     fn verify_hmac_sha256_known_vector() {
         let payload = b"hello world";
         let secret = b"my-secret";
-        let sig = compute_hmac_sha256(payload, secret);
+        let sig = sign_payload(payload, secret);
         assert!(verify_hmac_sha256(payload, secret, sig.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn sign_payload_rfc4231_known_vector() {
+        // RFC 4231 test case 2: key "Jefe",
+        // data "what do ya want for nothing?".
+        let sig = sign_payload(b"what do ya want for nothing?", b"Jefe");
+        assert_eq!(
+            sig,
+            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+        );
+    }
+
+    #[test]
+    fn sign_payload_roundtrips_through_verify() {
+        let payload = br#"{"order":"created","amount":4200}"#;
+        let secret = b"whsec_live_9f8e7d6c";
+        let signature = sign_payload(payload, secret);
+        verify_hmac_sha256(payload, secret, signature.as_bytes()).unwrap();
+        // The signature is bound to the exact (payload, secret) pair.
+        assert!(verify_hmac_sha256(payload, b"whsec_other", signature.as_bytes()).is_err());
+        assert!(verify_hmac_sha256(br#"{"amount":900}"#, secret, signature.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn sign_payload_is_lowercase_hex_of_32_bytes() {
+        let sig = sign_payload(b"payload", b"secret");
+        assert_eq!(sig.len(), 64);
+        assert!(
+            sig.chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+        );
     }
 
     #[test]
@@ -198,7 +257,7 @@ mod tests {
         let payload = b"hello world";
         let secret1 = b"secret-one";
         let secret2 = b"secret-two";
-        let sig = compute_hmac_sha256(payload, secret1);
+        let sig = sign_payload(payload, secret1);
         assert!(verify_hmac_sha256(payload, secret2, sig.as_bytes()).is_err());
     }
 
@@ -219,7 +278,7 @@ mod tests {
             .unwrap()
             .as_secs();
         let signed_payload = format!("{}.{}", now, body);
-        let v1 = compute_hmac_sha256(signed_payload.as_bytes(), secret.as_bytes());
+        let v1 = sign_payload(signed_payload.as_bytes(), secret.as_bytes());
         let sig_header = format!("t={},v1={}", now, v1);
 
         let event = verify_stripe_webhook(body, &sig_header, secret).unwrap();
@@ -234,7 +293,7 @@ mod tests {
             .unwrap()
             .as_secs();
         let signed_payload = format!("{}.{}", now, body);
-        let v1 = compute_hmac_sha256(signed_payload.as_bytes(), b"wrong-secret");
+        let v1 = sign_payload(signed_payload.as_bytes(), b"wrong-secret");
         let sig_header = format!("t={},v1={}", now, v1);
 
         let result = verify_stripe_webhook(body, &sig_header, "correct-secret");
@@ -251,7 +310,7 @@ mod tests {
     fn verify_gocardless_webhook_valid() {
         let body = r#"{"resource_type":"payments","action":"created"}"#;
         let secret = "gc_secret";
-        let hex_sig = compute_hmac_sha256(body.as_bytes(), secret.as_bytes());
+        let hex_sig = sign_payload(body.as_bytes(), secret.as_bytes());
         let sig_header = format!("hex={}", hex_sig);
 
         let event = verify_gocardless_webhook(body, &sig_header, secret).unwrap();

@@ -17,18 +17,10 @@
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use hmac::{Hmac, KeyInit, Mac};
 use webhookkit::{
-    ReplayGuard, WebhookError, verify_gocardless_webhook, verify_hmac_sha256,
-    verify_stripe_webhook, verify_timestamp,
+    ReplayGuard, WebhookError, sign_payload, sign_stripe_timestamped, verify_gocardless_webhook,
+    verify_hmac_sha256, verify_stripe_webhook, verify_timestamp,
 };
-type HmacSha256 = Hmac<sha2::Sha256>;
-
-fn sign(payload: &[u8], secret: &[u8]) -> String {
-    let mut mac = HmacSha256::new_from_slice(secret).unwrap();
-    mac.update(payload);
-    hex::encode(mac.finalize().into_bytes())
-}
 
 fn now_secs() -> u64 {
     SystemTime::now()
@@ -45,7 +37,7 @@ fn now_secs() -> u64 {
 fn valid_signature_roundtrips() {
     let payload = br#"{"order":"created","amount":4200}"#;
     let secret = b"whsec_live_9f8e7d6c";
-    let sig = sign(payload, secret);
+    let sig = sign_payload(payload, secret);
     verify_hmac_sha256(payload, secret, sig.as_bytes()).unwrap();
 }
 
@@ -54,7 +46,7 @@ fn forged_signature_fails() {
     // Attacker signs their own payload with their own secret but presents
     // it against the real secret.
     let payload = br#"{"order":"created"}"#;
-    let attacker_sig = sign(payload, b"attacker-known-secret");
+    let attacker_sig = sign_payload(payload, b"attacker-known-secret");
     let err = verify_hmac_sha256(payload, b"whsec_real", attacker_sig.as_bytes()).unwrap_err();
     assert!(matches!(err, WebhookError::InvalidSignature), "{err:?}");
 }
@@ -63,7 +55,7 @@ fn forged_signature_fails() {
 fn tampered_payload_fails_with_valid_signature_of_original() {
     let original = br#"{"amount":100}"#;
     let secret = b"whsec_real";
-    let sig = sign(original, secret);
+    let sig = sign_payload(original, secret);
     // Same length, same secret — only the payload byte flipped.
     let tampered = br#"{"amount":900}"#;
     assert_eq!(original.len(), tampered.len());
@@ -75,7 +67,7 @@ fn tampered_payload_fails_with_valid_signature_of_original() {
 fn tampered_signature_fails() {
     let payload = b"payload";
     let secret = b"whsec_real";
-    let mut sig = sign(payload, secret);
+    let mut sig = sign_payload(payload, secret);
     // Flip one hex nibble at a fixed position.
     let middle = sig.len() / 2;
     let c = sig.as_bytes()[middle];
@@ -88,13 +80,13 @@ fn tampered_signature_fails() {
 fn signature_of_different_length_fails_closed_with_same_error() {
     let payload = b"payload";
     let secret = b"whsec_real";
-    let sig = sign(payload, secret);
+    let sig = sign_payload(payload, secret);
 
     // Truncated and over-padded signatures must produce exactly the same
     // error as a wrong-but-well-sized signature: no length oracle.
     let truncated = &sig[..sig.len() - 2];
     let padded = format!("{sig}00");
-    let mismatched = sign(payload, b"other").repeat(2);
+    let mismatched = sign_payload(payload, b"other").repeat(2);
 
     for candidate in [truncated.to_string(), padded, mismatched] {
         let err = verify_hmac_sha256(payload, secret, candidate.as_bytes()).unwrap_err();
@@ -113,7 +105,7 @@ fn non_hex_signature_is_a_parse_error_not_invalid_signature() {
 
 #[test]
 fn empty_secret_and_payload_still_verify() {
-    let sig = sign(b"", b"");
+    let sig = sign_payload(b"", b"");
     verify_hmac_sha256(b"", b"", sig.as_bytes()).unwrap();
     let err = verify_hmac_sha256(b"", b"", b"00").unwrap_err();
     assert!(matches!(err, WebhookError::InvalidSignature));
@@ -123,9 +115,11 @@ fn empty_secret_and_payload_still_verify() {
 // verify_stripe_webhook — header format, timestamps, replay windows
 // ---------------------------------------------------------------------------
 
-fn stripe_header(payload: &[u8], secret: &str, ts: u64) -> String {
-    let signed = format!("{ts}.{}", String::from_utf8_lossy(payload));
-    format!("t={ts},v1={}", sign(signed.as_bytes(), secret.as_bytes()))
+fn stripe_header(body: &str, secret: &str, ts: u64) -> String {
+    format!(
+        "t={ts},v1={}",
+        sign_stripe_timestamped(&ts.to_string(), body, secret)
+    )
 }
 
 const STRIPE_BODY: &str = r#"{"id":"evt_456","type":"checkout.session.completed"}"#;
@@ -134,7 +128,7 @@ const STRIPE_BODY: &str = r#"{"id":"evt_456","type":"checkout.session.completed"
 fn stripe_valid_event_parses_type_and_id() {
     let event = verify_stripe_webhook(
         STRIPE_BODY,
-        &stripe_header(STRIPE_BODY.as_bytes(), "whsec_s", now_secs()),
+        &stripe_header(STRIPE_BODY, "whsec_s", now_secs()),
         "whsec_s",
     )
     .unwrap();
@@ -144,7 +138,7 @@ fn stripe_valid_event_parses_type_and_id() {
 
 #[test]
 fn stripe_forged_signature_rejected() {
-    let header = stripe_header(STRIPE_BODY.as_bytes(), "attacker", now_secs());
+    let header = stripe_header(STRIPE_BODY, "attacker", now_secs());
     let err = verify_stripe_webhook(STRIPE_BODY, &header, "whsec_s").unwrap_err();
     assert!(matches!(err, WebhookError::InvalidSignature));
 }
@@ -152,7 +146,7 @@ fn stripe_forged_signature_rejected() {
 #[test]
 fn stripe_tampered_body_rejected() {
     let secret = "whsec_s";
-    let header = stripe_header(STRIPE_BODY.as_bytes(), secret, now_secs());
+    let header = stripe_header(STRIPE_BODY, secret, now_secs());
     let tampered = r#"{"id":"evt_456","type":"refund.created"}"#;
     let err = verify_stripe_webhook(tampered, &header, secret).unwrap_err();
     assert!(matches!(err, WebhookError::InvalidSignature));
@@ -164,7 +158,7 @@ fn stripe_expired_timestamp_rejected_even_with_valid_signature() {
     // forever — the timestamp window is what bounds the replay window.
     let secret = "whsec_s";
     let stale = now_secs() - 3600;
-    let header = stripe_header(STRIPE_BODY.as_bytes(), secret, stale);
+    let header = stripe_header(STRIPE_BODY, secret, stale);
     let err = verify_stripe_webhook(STRIPE_BODY, &header, secret).unwrap_err();
     assert!(
         matches!(err, WebhookError::ExpiredTimestamp),
@@ -176,7 +170,7 @@ fn stripe_expired_timestamp_rejected_even_with_valid_signature() {
 fn stripe_future_timestamp_rejected() {
     let secret = "whsec_s";
     let future = now_secs() + 3600;
-    let header = stripe_header(STRIPE_BODY.as_bytes(), secret, future);
+    let header = stripe_header(STRIPE_BODY, secret, future);
     let err = verify_stripe_webhook(STRIPE_BODY, &header, secret).unwrap_err();
     assert!(matches!(err, WebhookError::ExpiredTimestamp));
 }
@@ -220,7 +214,7 @@ fn gocardless_roundtrip_and_rejections() {
 
     let event = verify_gocardless_webhook(
         body,
-        &format!("hex={}", sign(body.as_bytes(), secret.as_bytes())),
+        &format!("hex={}", sign_payload(body.as_bytes(), secret.as_bytes())),
         secret,
     )
     .unwrap();
@@ -230,14 +224,14 @@ fn gocardless_roundtrip_and_rejections() {
     // Forged.
     let err = verify_gocardless_webhook(
         body,
-        &format!("hex={}", sign(body.as_bytes(), b"other")),
+        &format!("hex={}", sign_payload(body.as_bytes(), b"other")),
         secret,
     )
     .unwrap_err();
     assert!(matches!(err, WebhookError::InvalidSignature));
 
     // Tampered.
-    let sig = sign(body.as_bytes(), secret.as_bytes());
+    let sig = sign_payload(body.as_bytes(), secret.as_bytes());
     let err = verify_gocardless_webhook(
         r#"{"resource_type":"payments","action":"confirmed"}"#,
         &format!("hex={sig}"),
@@ -274,7 +268,7 @@ fn replay_guard_full_pipeline_rejects_replayed_webhooks() {
     // but must hit the replay guard.
     let guard = ReplayGuard::new(Duration::from_secs(300));
     let secret = "whsec_flow";
-    let header = stripe_header(STRIPE_BODY.as_bytes(), secret, now_secs());
+    let header = stripe_header(STRIPE_BODY, secret, now_secs());
 
     for delivery in 0..2 {
         let verified = verify_stripe_webhook(STRIPE_BODY, &header, secret);
