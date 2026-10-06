@@ -124,8 +124,15 @@ pub fn verify_hmac_sha256(
         return Err(WebhookError::InvalidSignature);
     }
 
+    // Compare as slices explicitly. `hybrid-array` 0.4.15 added a
+    // `ct_eq(&self, other: &Self)` impl on `Array`, and because that impl takes
+    // `&Array` it wins method resolution over `subtle`'s slice impl — so
+    // `result.as_slice().ct_eq(signature_bytes.as_slice())` stopped compiling as soon as any crate in
+    // the graph pulled that version in. `as_slice()` names the slice impl
+    // explicitly, which is both the one that was always meant and the one that
+    // survives the next `hybrid-array` release.
     use subtle::ConstantTimeEq;
-    if result.ct_eq(&signature_bytes).into() {
+    if result.as_slice().ct_eq(signature_bytes.as_slice()).into() {
         Ok(())
     } else {
         Err(WebhookError::InvalidSignature)
