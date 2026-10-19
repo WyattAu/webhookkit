@@ -66,7 +66,6 @@ mod replay;
 #[cfg(feature = "std")]
 mod stripe;
 #[cfg(feature = "std")]
-mod signing;
 #[cfg(feature = "std")]
 mod timestamp;
 
