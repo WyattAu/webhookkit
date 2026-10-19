@@ -66,6 +66,9 @@ mod replay;
 #[cfg(feature = "std")]
 mod stripe;
 #[cfg(feature = "std")]
+pub use signing::sign_stripe_style_now;
+#[cfg(feature = "std")]
+mod signing;
 mod timestamp;
 
 extern crate alloc;
@@ -95,6 +98,7 @@ pub use replay::ReplayGuard;
 #[cfg(feature = "std")]
 pub use stripe::{StripeEvent, sign_stripe_timestamped, verify_stripe_webhook};
 #[cfg(feature = "std")]
+pub use signing::{sign_hmac_sha256, sign_stripe_style};
 pub use timestamp::verify_timestamp;
 
 use alloc::string::ToString;
