@@ -66,8 +66,6 @@ mod replay;
 #[cfg(feature = "std")]
 mod stripe;
 #[cfg(feature = "std")]
-pub use signing::sign_stripe_style_now;
-#[cfg(feature = "std")]
 mod signing;
 #[cfg(feature = "std")]
 mod timestamp;
@@ -99,7 +97,6 @@ pub use replay::ReplayGuard;
 #[cfg(feature = "std")]
 pub use stripe::{StripeEvent, sign_stripe_timestamped, verify_stripe_webhook};
 #[cfg(feature = "std")]
-pub use signing::{sign_hmac_sha256, sign_stripe_style};
 #[cfg(feature = "std")]
 pub use timestamp::verify_timestamp;
 
