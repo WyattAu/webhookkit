@@ -39,6 +39,10 @@ std = ["dep:idempotency-kit", "idempotency-kit/memory"]
 hmac-sha256 = []
 ffi = []
 
+[[test]]
+name = "integration"
+required-features = ["std"]
+
 [dev-dependencies]
 proptest = "1"
 # redis_replay.rs: a throwaway Redis per test run (docker).

@@ -1,3 +1,4 @@
+use alloc::format;
 use alloc::string::{String, ToString};
 
 use crate::verify_hmac_sha256;
@@ -41,7 +42,7 @@ pub fn sign_stripe_style_now(body: &str, secret: &str) -> (String, String) {
     sign_stripe_style(body, secret, now_secs)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
 

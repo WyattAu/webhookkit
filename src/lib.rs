@@ -69,6 +69,7 @@ mod stripe;
 pub use signing::sign_stripe_style_now;
 #[cfg(feature = "std")]
 mod signing;
+#[cfg(feature = "std")]
 mod timestamp;
 
 extern crate alloc;
@@ -99,6 +100,7 @@ pub use replay::ReplayGuard;
 pub use stripe::{StripeEvent, sign_stripe_timestamped, verify_stripe_webhook};
 #[cfg(feature = "std")]
 pub use signing::{sign_hmac_sha256, sign_stripe_style};
+#[cfg(feature = "std")]
 pub use timestamp::verify_timestamp;
 
 use alloc::string::ToString;
@@ -337,6 +339,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn verify_timestamp_within_tolerance() {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -346,6 +349,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn verify_timestamp_outside_tolerance() {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -356,6 +360,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn verify_timestamp_invalid_format() {
         assert!(verify_timestamp("not-a-number", 300).is_err());
     }
