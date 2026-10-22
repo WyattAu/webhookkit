@@ -852,6 +852,11 @@ criteria = "safe-to-deploy"
 version = "1.0.23"
 criteria = "safe-to-deploy"
 
+
 [[exemptions.rustls]]
 version = "0.23.44"
-criteria = ""
+criteria = ""safe-to-run""
+
+[[exemptions.rustls-webpki]]
+version = "0.103.16"
+criteria = ""safe-to-run""
