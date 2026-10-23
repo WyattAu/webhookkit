@@ -1,4 +1,5 @@
 # webhookkit
+[![Estate integration](https://github.com/WyattAu/estate-integration/actions/workflows/ci.yml/badge.svg)](https://github.com/WyattAu/estate-integration/actions/workflows/ci.yml)
 
 Verify webhook signatures in Rust: with a **`no_std`-compatible core**.
 
