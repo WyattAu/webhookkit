@@ -1,4 +1,4 @@
-# Security Policy — webhookkit
+# Security Policy: webhookkit
 
 ## Supported Versions
 
@@ -22,13 +22,13 @@ credited in the advisory unless anonymity is requested.
 
 For issues in the underlying primitives (HMAC-SHA256, constant-time
 comparison), also consider reporting upstream to
-[RustCrypto](https://github.com/RustCrypto/SECURITY.md) — this crate defers
+[RustCrypto](https://github.com/RustCrypto/SECURITY.md): this crate defers
 cryptographic correctness to `hmac`/`sha2`/`subtle`.
 
 ## Scope
 
-In scope: anything that breaks the crate's documented security contract —
-panic on adversarial input in code paths documented as panic-free
+In scope: anything that breaks the crate's documented security contract,
+including panic on adversarial input in code paths documented as panic-free
 (`verify_hmac_sha256`, `verify_stripe_webhook`, `verify_gocardless_webhook`,
 `verify_timestamp`, `ReplayGuard::check`, and the `ffi` feature's exported
 functions), signature/MAC bypass, timing side channels in secret-dependent

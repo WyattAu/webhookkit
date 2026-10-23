@@ -1,19 +1,19 @@
 # Changelog
 
 All notable changes to this project are documented here. Format: [Keep a
-Changelog](https://keepachangelog.com/) — versions follow [semver](https://semver.org).
+Changelog](https://keepachangelog.com/): versions follow [semver](https://semver.org).
 
 ## [2.2.0] - 2026-09-19
 
 ### Added
 
-- **Public signing helpers** — the counterparts of every verify path, so
+- **Public signing helpers**: the counterparts of every verify path, so
   hosts can build genuine test fixtures (faked provider deliveries,
   replay suites) without mirroring the crypto stack in
   `[dev-dependencies]`:
   - `sign_payload(payload, secret) -> String`: lowercase-hex HMAC-SHA256,
     the signing twin of [`verify_hmac_sha256`]. Core-only like its
-    counterpart — available under `--no-default-features`.
+    counterpart: available under `--no-default-features`.
   - `sign_stripe_timestamped(timestamp, body, secret) -> String`: the
     Stripe `v1=` value (HMAC-SHA256 over `"{timestamp}.{body}"`), for
     composing `t=…,v1=…` header fixtures that
@@ -26,7 +26,7 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 
 - webhookkit's own integration and Redis suites now sign their fixtures
   through the new public API, and the `hmac`/`sha2`/`hex`
-  dev-dependencies are gone — the API is sufficient for its tests, which
+  dev-dependencies are gone: the API is sufficient for its tests, which
   is the point.
 
 ## [2.1.0] - 2026-09-16
@@ -34,8 +34,8 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 ### Changed
 
 - **`ReplayGuard` and `RedisReplayGuard` are re-expressed over
-  [`idempotency-kit`](https://crates.io/crates/idempotency-kit) — the
-  estate's single claim primitive — replacing webhookkit's private
+  [`idempotency-kit`](https://crates.io/crates/idempotency-kit): the
+  estate's single claim primitive: replacing webhookkit's private
   HashMap+Mutex bookkeeping. The public API is unchanged** (constructors,
   `check`/`remove`/`len`/`is_empty`/`capacity`/`expiry`,
   `DEFAULT_REPLAY_CAPACITY`, `WebhookError` variants), and the full unit,
@@ -48,7 +48,7 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
     owns TTL-sweep or capacity code.
   - Claim mapping: `Claim::First` → `Ok(())`; `Claim::InFlight` and
     `Claim::Replay(_)` → `ReplayDetected`. An unfinished claim means the
-    event was already accepted within the window — webhook dedup has no
+    event was already accepted within the window: webhook dedup has no
     response-replay stage, so this differs from `idempotency-kit`'s
     executor semantics (where `InFlight` is retryable).
   - The memory guard's expiry window is now measured from the first
@@ -59,7 +59,7 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
     (BLAKE3 of the event ID) instead of `webhookkit:replay:{event_id}`:
     raw event IDs no longer appear in Redis, and webhook dedup state
     interoperates with `idempotency-kit::RedisStore` under the `webhook`
-    scope. 2.0.0 Redis state is not migrated — event IDs seen in the
+    scope. 2.0.0 Redis state is not migrated: event IDs seen in the
     final window of a 2.0.0 deployment may be delivered once more after
     upgrading.
   - Public auto-trait surface is preserved: the guard is still
@@ -86,7 +86,7 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
   collapsed duplicate `v1=` values into a map, so during signing-secret
   rotation (Stripe sends one `v1=` per active secret) legitimate webhooks
   were rejected. All `v1=` signatures are now tried and any match verifies.
-- `WebhookError` is now `#[non_exhaustive]` ( breaking — matchers must add
+- `WebhookError` is now `#[non_exhaustive]` ( breaking: matchers must add
   a wildcard arm).
 - Removed incorrect `#[allow(dead_code)]` from used parser functions.
 
@@ -95,7 +95,7 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 - `ReplayGuard::with_capacity(expiry, capacity)` and accessors
   `capacity()` / `expiry()`; default capacity 65,536.
 - `verify_stripe_webhook_with_tolerance(body, sig, secret, tolerance_secs)`
-  — configurable timestamp tolerance (default 300s via
+  for a configurable timestamp tolerance (default 300s via
   `verify_stripe_webhook`, now exposed as
   `DEFAULT_STRIPE_TOLERANCE_SECS`).
 - Fuzz target `fuzz_stripe_signature` for the signature header parser.
@@ -141,7 +141,7 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 - `no_std` support: stateless HMAC-SHA256 verification, GoCardless
   verification/parsing, and the `ffi` surface build core-only with
   `--no-default-features` (thumbv7em-none-eabihf passes `cargo check`).
-  New `std` feature (on by default — default builds are unchanged).
+  New `std` feature (on by default: default builds are unchanged).
 
 ### Changed
 - `timestamp`, `replay`, and `stripe` modules are gated behind the new
@@ -153,8 +153,8 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 ### Docs
 - README and crate docs now lead with the differentiators (`no_std`
   verification core, `ReplayGuard`, Stripe/GoCardless parsers) and add a
-  feature matrix vs `async-stripe` (full Stripe API — different scope) and
-  `svix` (webhook sending — different direction), with honest notes on
+  feature matrix vs `async-stripe` (full Stripe API: different scope) and
+  `svix` (webhook sending: different direction), with honest notes on
   where webhookkit lags.
 
 ## [1.0.0] - 2026-09-05
@@ -166,7 +166,7 @@ stability guarantees (verified with `cargo-semver-checks` on every release).
 
 - C FFI tests exercising the full `ffi` module contract from Rust
   (valid → `1`, tampered → `0`, invalid hex / non-UTF-8 / null → `-1`,
-  `webhookkit_version` returns the crate version) — no C toolchain required.
+  `webhookkit_version` returns the crate version): no C toolchain required.
 - `THREAT-MODEL.md`: STRIDE analysis with verifying-test citations.
 - `SECURITY.md`: vulnerability disclosure policy and scope.
 

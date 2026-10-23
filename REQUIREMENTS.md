@@ -1,10 +1,10 @@
-# Requirements — webhookkit
+# Requirements: webhookkit
 
 Numbered, testable requirements. Every requirement maps to at least one named
 test; every security-relevant test cites at least one requirement. Threat
 IDs reference `THREAT-MODEL.md`.
 
-Scope note: `webhookkit` provides webhook signature verification — HMAC-SHA256
+Scope note: `webhookkit` provides webhook signature verification: HMAC-SHA256
 sign/verify over raw payloads, Stripe and GoCardless parsers, timestamp
 freshness validation, an in-process `ReplayGuard` (std), a `RedisReplayGuard`
 (std + redis), and a panic-free C FFI surface (`ffi` feature). Core-only
@@ -28,7 +28,7 @@ builds work with `--no-default-features`.
 |----|-------------|----------|
 | REQ-WK-100 | Forged signatures are never accepted: verification recomputes HMAC over the exact provider canonical payload (Stripe: `t + "." + body`), not over caller-supplied strings (T2) | MUST |
 | REQ-WK-101 | Replay protection: `ReplayGuard` denies a second `check` of the same event ID inside the window; the Stripe path additionally enforces timestamp freshness (T3) | MUST |
-| REQ-WK-102 | Signature comparison is constant-time via the RustCrypto `hmac` crate — no caller-configurable comparison path exists (T5) | MUST |
+| REQ-WK-102 | Signature comparison is constant-time via the RustCrypto `hmac` crate: no caller-configurable comparison path exists (T5) | MUST |
 | REQ-WK-103 | Secret material is never stored in `Debug`/`Display` output or logged; secrets are consumed by reference | MUST |
 | REQ-WK-104 | No panic on malformed input: hostile JSON, truncated headers, non-UTF-8 payloads, and deep nesting produce typed `WebhookError`s (T1, T7) | MUST |
 | REQ-WK-105 | FFI boundary rejects null pointers and non-UTF-8/invalid inputs with `-1` and never dereferences invalid memory (T6) | MUST |

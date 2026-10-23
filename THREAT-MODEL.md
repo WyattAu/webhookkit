@@ -1,4 +1,4 @@
-# Threat Model — webhookkit
+# Threat Model: webhookkit
 
 Reference: STRIDE. Scope: the crate's public API surface as used by a
 downstream service. Trust boundaries: (1) bytes/strings entering public parse
@@ -57,7 +57,7 @@ or verify functions (`verify_hmac_sha256`, `verify_stripe_webhook`,
 ## Residual Risks
 
 - **R1 (Medium, accepted):** `ReplayGuard` clears its entire set when it
-  exceeds 10 000 entries — an attacker who can cause >10 000 distinct event
+  exceeds 10 000 entries: an attacker who can cause >10 000 distinct event
   IDs within the expiry window can flush the guard and replay one older ID.
   Accepted because bounded memory prevents unbounded-growth DoS (A3); the
   300 s timestamp window on Stripe limits practical replay value. Mitigation
@@ -65,7 +65,7 @@ or verify functions (`verify_hmac_sha256`, `verify_stripe_webhook`,
   the in-memory guard.
 - **R2 (Low, accepted):** The C ABI trusts caller-supplied `(ptr, len)`
   pairs. A non-null but invalid pointer is indistinguishable from valid
-  memory — the null/UTF-8 guards catch the common C-binding mistakes, but
+  memory: the null/UTF-8 guards catch the common C-binding mistakes, but
   dangling pointers remain the C caller's responsibility (documented in the
   `# Safety` contract).
 - **R3 (Low, accepted):** Wall-clock dependence: `verify_timestamp` uses

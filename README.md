@@ -1,6 +1,6 @@
 # webhookkit
 
-Verify webhook signatures in Rust — with a **`no_std`-compatible core**.
+Verify webhook signatures in Rust: with a **`no_std`-compatible core**.
 
 [![CI](https://github.com/WyattAu/webhookkit/actions/workflows/ci.yml/badge.svg)](https://github.com/WyattAu/webhookkit/actions)
 [![crates.io](https://img.shields.io/crates/v/webhookkit)](https://crates.io/crates/webhookkit)
@@ -8,15 +8,15 @@ Verify webhook signatures in Rust — with a **`no_std`-compatible core**.
 
 ## Why webhookkit
 
-- **`no_std` verification core.** The stateless HMAC-SHA256 path —
+- **`no_std` verification core.** The stateless HMAC-SHA256 path:
   [`verify_hmac_sha256`](https://docs.rs/webhookkit/latest/webhookkit/fn.verify_hmac_sha256.html),
-  GoCardless parsing, and the C FFI surface — builds with
+  GoCardless parsing, and the C FFI surface: builds with
   `--no-default-features` on `core` + `alloc` (CI checks it against
   `thumbv7em-none-eabihf`). The heavy lifting is RustCrypto `hmac`/`sha2`,
   both `no_std`. The wall-clock/mutex surfaces (`timestamp`, `replay`,
   `stripe`) are gated behind the on-by-default `std` feature.
 - **Multi-provider out of the box.** Signature formats for **Stripe**
-  (`t=…,v1=…`) and **GoCardless** (`hex=…`) are parsed and verified for you —
+  (`t=…,v1=…`) and **GoCardless** (`hex=…`) are parsed and verified for you;
   no hand-rolled header parsing.
 - **Replay protection built in.** [`ReplayGuard`](https://docs.rs/webhookkit/latest/webhookkit/struct.ReplayGuard.html)
   tracks processed event IDs with a TTL window, so "webhooks arrive at least
@@ -27,24 +27,24 @@ Verify webhook signatures in Rust — with a **`no_std`-compatible core**.
 ## Feature matrix
 
 webhookkit does one thing: **verify inbound webhook signatures**. That puts
-it next to — not against — two crates it's often compared with:
+it next to (not against) two crates it's often compared with:
 
 |                              | webhookkit            | async-stripe                    | svix                            |
 |------------------------------|-----------------------|---------------------------------|--------------------------------|
 | Scope                        | inbound verification  | full Stripe REST API client     | webhook *sending* platform     |
 | `no_std` core                | yes                   | no                              | no                             |
-| Stripe webhook verify        | yes                   | yes (`webhook-events` feature)  | —                              |
-| GoCardless webhook verify    | yes                   | —                               | —                              |
+| Stripe webhook verify        | yes                   | yes (`webhook-events` feature)  |               no               ||
+| GoCardless webhook verify    | yes                   |                no               ||               no               ||
 | Replay / timestamp guard     | built-in (`ReplayGuard`) | manual                        | platform-side (signing + retries) |
-| Send webhooks / delivery     | —                     | —                               | yes                            |
-| Stripe REST API calls        | —                     | yes                             | —                              |
+| Send webhooks / delivery     |           no          ||                no               || yes                            |
+| Stripe REST API calls        |           no          || yes                             |               no               ||
 | C FFI surface                | yes (generated header)| no                              | no                             |
 | Runtime                      | sync, no transport    | async (reqwest/hyper)           | async HTTP                     |
 
 ### Where webhookkit lags (honestly)
 
 - **No Stripe API.** async-stripe covers the entire Stripe REST surface and
-  its webhook verification is solid — if you're already calling the Stripe
+  its webhook verification is solid: if you're already calling the Stripe
   API, use it. webhookkit earns its keep when verification is all you need,
   or when `no_std`/FFI/small-dependency constraints apply.
 - **No webhook sending.** svix (and the `svix` crate) handle outbound
@@ -116,10 +116,10 @@ genuine signatures without `hmac`/`sha2` dev-dependencies:
 ```rust
 use webhookkit::{sign_payload, sign_stripe_timestamped, verify_stripe_webhook};
 
-// Raw HMAC-SHA256 (hex) — GoCardless `hex=…`, custom schemes, no_std:
+// Raw HMAC-SHA256 (hex): GoCardless `hex=…`, custom schemes, no_std:
 let hex_sig = sign_payload(payload, secret);
 
-// Stripe: the v1= value over "{timestamp}.{body}" —
+// Stripe: the v1= value over "{timestamp}.{body}":
 // compose the header as t={timestamp},v1={signature}:
 let timestamp = "1700000000";
 let v1 = sign_stripe_timestamped(timestamp, body, "whsec_test");
