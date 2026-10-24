@@ -1,6 +1,6 @@
 [package]
 name = "webhookkit"
-version = "2.2.2"
+version = "2.2.3"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -23,7 +23,7 @@ redis = { version = "0.27", default-features = false, features = ["tokio-comp", 
 # store backs `ReplayGuard` (under `std`); the Redis store backs
 # `RedisReplayGuard` (under `redis`). Optional and feature-activated so
 # the no_std core never pulls it.
-idempotency-kit = { version = "0.1", default-features = false, optional = true }
+idempotency-kit = { version = "1", default-features = false, optional = true }
 
 [features]
 default = ["std", "hmac-sha256"]
