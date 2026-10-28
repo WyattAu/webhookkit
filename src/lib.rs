@@ -127,7 +127,11 @@ pub fn verify_hmac_sha256(
     }
 
     use subtle::ConstantTimeEq;
-    if result.ct_eq(&signature_bytes).into() {
+    // hybrid-array (hmac 0.13 / digest 0.11) does not deref-coerce a
+    // Vec the way generic-array 0.14 did: compare slices explicitly so
+    // the crate compiles against its own declared hmac 0.13 requirement
+    // (2.2.3 published without this and broke under its own resolution).
+    if result.as_slice().ct_eq(signature_bytes.as_slice()).into() {
         Ok(())
     } else {
         Err(WebhookError::InvalidSignature)
