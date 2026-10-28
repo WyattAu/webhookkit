@@ -2,7 +2,7 @@
 name = "webhookkit"
 version = "2.2.3"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 license = "MIT OR Apache-2.0"
 description = "Verify webhook signatures in Rust: with a nostd-compatible core"
 readme = "README.md"
