@@ -100,6 +100,20 @@ Changelog](https://keepachangelog.com/): versions follow [semver](https://semver
   `DEFAULT_STRIPE_TOLERANCE_SECS`).
 - Fuzz target `fuzz_stripe_signature` for the signature header parser.
 
+## [Unreleased]
+
+### Added
+
+- `sign_hmac_sha256(payload, secret) -> String`: the outbound
+  counterpart of `verify_hmac_sha256` — lowercase hex HMAC-SHA256 for
+  signing payloads you emit. `no_std`-compatible (core + alloc).
+- `send` feature (opt-in, implies `std`): one-shot outbound delivery via
+  `send::post_json` — `POST` a body as `application/json` with an optional
+  signature header, a per-request timeout, and URL-scrubbed transport
+  errors (`DeliveryError`). Non-2xx statuses come back as
+  `DeliveryOutcome::Rejected(u16)`, not errors: retry classification is
+  the caller's policy, composed with a retry/backoff kit.
+
 ## [1.1.2] - 2026-09-12
 
 ### Added

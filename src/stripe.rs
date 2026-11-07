@@ -103,7 +103,7 @@ pub fn verify_stripe_webhook_with_tolerance(
 /// `[dev-dependencies]` mirror of the crypto stack.
 pub fn sign_stripe_timestamped(timestamp: &str, body: &str, secret: &str) -> String {
     let signed_payload = format!("{timestamp}.{body}");
-    crate::sign_payload(signed_payload.as_bytes(), secret.as_bytes())
+    crate::sign_hmac_sha256(signed_payload.as_bytes(), secret.as_bytes())
 }
 
 /// Parse a `Stripe-Signature` header into the timestamp and the ordered

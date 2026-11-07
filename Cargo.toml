@@ -24,6 +24,8 @@ redis = { version = "0.27", default-features = false, features = ["tokio-comp", 
 # `RedisReplayGuard` (under `redis`). Optional and feature-activated so
 # the no_std core never pulls it.
 idempotency-kit = { version = "1", default-features = false, optional = true }
+# `send` transport: one signed async POST per call (`send::post_json`).
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"], optional = true }
 
 [features]
 default = ["std", "hmac-sha256"]
@@ -38,6 +40,10 @@ redis = ["dep:redis", "idempotency-kit/redis"]
 std = ["dep:idempotency-kit", "idempotency-kit/memory"]
 hmac-sha256 = []
 ffi = []
+# Outbound delivery (`send::post_json`): one signed async POST, no retries.
+# Needs std for `Duration`; the caller supplies the reqwest client and the
+# async runtime.
+send = ["std", "dep:reqwest"]
 
 [[test]]
 name = "integration"
