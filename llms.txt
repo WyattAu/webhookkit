@@ -1,0 +1,16 @@
+# webhookkit
+
+> Webhook signature verification for Rust with a no_std-compatible core:
+> constant-time HMAC-SHA256 sign/verify over raw payloads, Stripe (`t=…,v1=…`)
+> and GoCardless (`hex=…`) parsers, timestamp freshness validation,
+> in-process `ReplayGuard` (plus `RedisReplayGuard` under the redis feature),
+> a panic-free C FFI surface, and a one-shot signed POST under the `send`
+> feature. `#![forbid(unsafe_code)]`.
+
+## Docs
+
+- [README.md](README.md): verification semantics, feature matrix, quick start, honest comparison with async-stripe and svix.
+- [REQUIREMENTS.md](REQUIREMENTS.md): numbered requirements REQ-WK-001..202 with test traceability.
+- [THREAT-MODEL.md](THREAT-MODEL.md): threat model referenced by requirement threat IDs.
+- [SECURITY.md](SECURITY.md): security policy.
+- [CHANGELOG.md](CHANGELOG.md): release history.

@@ -137,6 +137,16 @@ Stripe-Signature: t=1700000000,v1=abc123...
 | `no_std` core           | Yes                 | Depends on your impl          |
 | `forbid(unsafe_code)`   | Yes                 | Depends on your impl          |
 
+## Where the truth lives
+
+| Concern | File |
+|---|---|
+| Verification semantics, providers, usage (normative) | `README.md` |
+| Requirements REQ-WK-001..202 + traceability | `REQUIREMENTS.md` |
+| Threat model | `THREAT-MODEL.md` |
+| Security policy | `SECURITY.md` |
+| Release history | `CHANGELOG.md` |
+
 ## License
 
 Licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE)
